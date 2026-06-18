@@ -1,5 +1,46 @@
 const API_BASE = window.location.origin;
 
+// ── Auth ──────────────────────────────────────────────────────────
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    ...options,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = data?.detail || data?.message || `Erro ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function signup(email, password) {
+  return apiFetch("/api/auth/signup", {
+    method: "POST",
+    body: { email, password },
+  });
+}
+
+async function login(email, password) {
+  return apiFetch("/api/auth/login", {
+    method: "POST",
+    body: { email, password },
+  });
+}
+
+async function logout() {
+  return apiFetch("/api/auth/logout", { method: "POST" });
+}
+
+async function fetchMe() {
+  return apiFetch("/api/auth/me");
+}
+
+// ── Chat ──────────────────────────────────────────────────────────
+
 async function sendMessageStream({ message, history, onDelta, signal }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",

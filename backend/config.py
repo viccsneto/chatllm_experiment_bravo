@@ -16,3 +16,6 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SQLITE_PATH = ROOT_DIR / "database" / "chat.db"
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{SQLITE_PATH}"
+
+# Session middleware — chave fixa para ambiente dev; em producao usar os.getenv
+SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "chatllm-dev-secret-change-in-production")
