@@ -71,6 +71,41 @@ async def generate_reply(*, user_message: str, history: list[dict], model: str |
     return reply, resolved_model
 
 
+async def generate_title(*, user_message: str) -> str:
+    """Gera um titulo curto (max 60 chars) para a sessao baseado na primeira mensagem do usuario."""
+    if not OPENROUTER_API_KEY:
+        return "New chat"
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a title generator. Create a very short title (max 60 characters, plain text, no quotes) "
+                "that summarizes the user's message below. Reply with ONLY the title, nothing else."
+            ),
+        },
+        {"role": "user", "content": user_message.strip()},
+    ]
+
+    payload = {
+        "model": "google/gemma-4-31b-it",
+        "messages": messages,
+        "max_tokens": 30,
+        "temperature": 0.3,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(OPENROUTER_API_URL, json=payload, headers=_build_headers())
+        if response.status_code >= 400:
+            return "New chat"
+        data = response.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        return (content[:60] if content else "New chat")
+    except Exception:
+        return "New chat"
+
+
 async def stream_reply(*, user_message: str, history: list[dict], model: str | None = None):
     if not OPENROUTER_API_KEY:
         raise OpenRouterConfigError(
