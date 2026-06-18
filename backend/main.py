@@ -3,17 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import SESSION_SECRET_KEY
 from backend.database import Base, engine
 from backend.routers.auth import router as auth_router
 from backend.routers.chat import router as chat_router
+from backend.routers.sessions import router as sessions_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -23,12 +22,10 @@ app = FastAPI(title="ChatLLM Experiment API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
@@ -43,6 +40,7 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 app.add_middleware(NoCacheMiddleware)
 
 app.include_router(auth_router)
+app.include_router(sessions_router)
 app.include_router(chat_router)
 
 NO_CACHE_HEADERS = {

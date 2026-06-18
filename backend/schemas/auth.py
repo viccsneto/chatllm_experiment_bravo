@@ -23,4 +23,5 @@ class UserResponse(BaseModel):
 
 class AuthResponse(BaseModel):
     user: UserResponse
+    token: str | None = None
     message: str = "Operacao realizada com sucesso."

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -8,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database import Base, get_db
 from backend.main import app
+from backend.models import User
 
 
 @pytest.fixture(scope="session")
@@ -65,3 +67,28 @@ def client(db_session):
         yield test_client
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_client(client, db_session):
+    """Retorna um TestClient autenticado com um usuario criado.
+
+    Cria um usuario de teste, faz login e retorna (client, token).
+    """
+    hashed = bcrypt.hashpw("secret123".encode("utf-8"), bcrypt.gensalt())
+    user = User(
+        email="test@example.com",
+        password_hash=hashed.decode("utf-8"),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post("/api/auth/login", json={"email": "test@example.com", "password": "secret123"})
+    assert response.status_code == 200
+    token = response.json()["token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client
+
+    response = client.post("/api/auth/login", json={"email": "test@example.com", "password": "secret123"})
+    assert response.status_code == 200
+    return client

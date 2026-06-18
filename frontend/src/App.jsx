@@ -5,7 +5,7 @@ function createMessageId() {
 }
 
 function AuthForm({ onAuthSuccess }) {
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,9 +107,86 @@ function AuthForm({ onAuthSuccess }) {
   );
 }
 
+function Sidebar({ sessions, activeSessionId, onSelectSession, onNewChat, onDeleteSession, onClose }) {
+  return (
+    <>
+      {/* Overlay para mobile */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)",
+          zIndex: 98,
+        }}
+      />
+      <aside style={{
+        position: "fixed", top: 0, left: 0, bottom: 0,
+        width: "260px", background: "#f9f9f9",
+        borderRight: "1px solid var(--border)",
+        display: "flex", flexDirection: "column",
+        zIndex: 99, overflow: "hidden",
+      }}>
+        <div style={{ padding: "12px", borderBottom: "1px solid var(--border)" }}>
+          <button
+            onClick={onNewChat}
+            style={{
+              width: "100%", padding: "10px", borderRadius: "8px",
+              border: "1px solid var(--border)", background: "#fff",
+              cursor: "pointer", fontSize: "0.9rem", fontWeight: 500,
+              color: "var(--text)",
+            }}
+          >
+            + Nova conversa
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
+          {sessions.length === 0 && (
+            <p style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.85rem", marginTop: "24px" }}>
+              Nenhuma conversa ainda
+            </p>
+          )}
+          {sessions.map((s) => (
+            <div
+              key={s.id}
+              onClick={() => onSelectSession(s.id)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 12px", borderRadius: "8px", marginBottom: "4px",
+                cursor: "pointer", fontSize: "0.88rem",
+                background: s.id === activeSessionId ? "#e8e8e8" : "transparent",
+                color: "var(--text)", fontWeight: s.id === activeSessionId ? 600 : 400,
+              }}
+            >
+              <span style={{
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+              }}>
+                {s.title}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id); }}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--muted)", fontSize: "0.8rem", padding: "2px 4px",
+                  flexShrink: 0, opacity: 0.5,
+                }}
+                title="Remover sessao"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      </aside>
+    </>
+  );
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [sessions, setSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -122,11 +199,7 @@ function App() {
     fetchMe()
       .then((u) => {
         setUser(u);
-        setMessages([{
-          id: createMessageId(),
-          role: "assistant",
-          content: `Bem-vindo(a) ao ChatLLM Lab, ${u.email}! Como posso ajudar voce hoje?`,
-        }]);
+        return refreshSessions();
       })
       .catch(() => {
         setUser(null);
@@ -134,11 +207,6 @@ function App() {
       })
       .finally(() => setLoadingAuth(false));
   }, []);
-
-  const chatHistory = useMemo(
-    () => messages.filter((msg) => msg.role === "user" || msg.role === "assistant"),
-    [messages]
-  );
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -151,10 +219,71 @@ function App() {
     };
   }, []);
 
+  const refreshSessions = async () => {
+    try {
+      const data = await listSessions();
+      setSessions(data.sessions);
+      return data.sessions;
+    } catch {
+      return [];
+    }
+  };
+
+  const chatHistory = useMemo(
+    () => messages.filter((msg) => msg.role === "user" || msg.role === "assistant"),
+    [messages]
+  );
+
   const onStop = () => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setBusy(false);
+  };
+
+  const loadSession = async (sessionId) => {
+    try {
+      const data = await getSession(sessionId);
+      setMessages(
+        data.messages.map((m) => ({
+          id: createMessageId(),
+          role: m.role,
+          content: m.content,
+        }))
+      );
+      setActiveSessionId(sessionId);
+      setSidebarOpen(false);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleNewChat = async () => {
+    try {
+      const data = await createSession();
+      setActiveSessionId(data.id);
+      setMessages([{
+        id: createMessageId(),
+        role: "assistant",
+        content: "Nova conversa. Como posso ajudar voce?",
+      }]);
+      await refreshSessions();
+      setSidebarOpen(false);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    try {
+      await deleteSession(sessionId);
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null);
+        setMessages([]);
+      }
+      await refreshSessions();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const onSubmit = async (event) => {
@@ -163,6 +292,21 @@ function App() {
     if (!cleaned || busy) return;
 
     setError("");
+
+    // Se nao ha sessao ativa, cria uma automaticamente
+    let sid = activeSessionId;
+    if (!sid) {
+      try {
+        const data = await createSession();
+        sid = data.id;
+        setActiveSessionId(sid);
+        refreshSessions();
+      } catch (err) {
+        setError(err.message);
+        return;
+      }
+    }
+
     const userMessage = { id: createMessageId(), role: "user", content: cleaned };
     const assistantMessageId = createMessageId();
 
@@ -180,6 +324,7 @@ function App() {
       await sendMessageStream({
         message: cleaned,
         history: chatHistory,
+        sessionId: sid,
         signal: abortController.signal,
         onDelta: (delta) => {
           setMessages((prev) =>
@@ -199,6 +344,9 @@ function App() {
             : msg
         )
       );
+
+      // Atualizar lista de sessoes (para pegar o titulo gerado)
+      await refreshSessions();
     } catch (err) {
       const aborted = err?.name === "AbortError";
       if (!aborted) {
@@ -220,6 +368,8 @@ function App() {
         );
       }
     } finally {
+      // Atualiza sidebar mesmo em caso de erro (titulo pode ter sido gerado)
+      refreshSessions();
       abortControllerRef.current = null;
       setBusy(false);
     }
@@ -230,10 +380,12 @@ function App() {
       await logout();
     } catch { /* ignore */ }
     setUser(null);
+    setSessions([]);
+    setActiveSessionId(null);
     setMessages([]);
   };
 
-  // Tela de carregamento inicial
+  // Tela de carregamento
   if (loadingAuth) {
     return (
       <main className="app-shell">
@@ -247,65 +399,96 @@ function App() {
     );
   }
 
-  // Tela de login/cadastro
+  // Tela de login
   if (!user) {
     return (
       <main className="app-shell">
-        <AuthForm onAuthSuccess={(u) => {
+        <AuthForm onAuthSuccess={async (u) => {
           setUser(u);
-          setMessages([{
-            id: createMessageId(),
-            role: "assistant",
-            content: `Bem-vindo(a) ao ChatLLM Lab, ${u.email}! Como posso ajudar voce hoje?`,
-          }]);
+          await refreshSessions();
         }} />
       </main>
     );
   }
 
-  // Chat autenticado
+  // Chat autenticado com sidebar
   return (
-    <main className="app-shell">
-      <header className="app-header" style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-      }}>
-        <div className="brand">ChatLLM Lab</div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>{user.email}</span>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: "none", border: "1px solid var(--border)", borderRadius: "6px",
-              padding: "4px 12px", cursor: "pointer", fontSize: "0.85rem",
-              color: "var(--text)",
-            }}
-          >
-            Sair
-          </button>
-        </div>
-      </header>
+    <div style={{ display: "flex", height: "100%", width: "100%" }}>
+      {/* Sidebar */}
+      {sidebarOpen && (
+        <Sidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={loadSession}
+          onNewChat={handleNewChat}
+          onDeleteSession={handleDeleteSession}
+          onClose={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <section className="messages" aria-live="polite" ref={messagesRef}>
-        <div className="messages-inner">
-          {messages.map((msg) => (
-            <article key={msg.id} className={`bubble ${msg.role}`}>
-              <MessageContent content={msg.content} />
-            </article>
-          ))}
-        </div>
-      </section>
+      {/* Main content */}
+      <main className="app-shell" style={{ flex: 1, minWidth: 0 }}>
+        <header className="app-header" style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                padding: "4px", color: "var(--text)", fontSize: "1.2rem",
+              }}
+              aria-label="Abrir sidebar"
+            >
+              ☰
+            </button>
+            <div className="brand">ChatLLM Lab</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>{user.email}</span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: "none", border: "1px solid var(--border)", borderRadius: "6px",
+                padding: "4px 12px", cursor: "pointer", fontSize: "0.85rem",
+                color: "var(--text)",
+              }}
+            >
+              Sair
+            </button>
+          </div>
+        </header>
 
-      <Composer
-        text={text}
-        busy={busy}
-        error={error}
-        onChangeText={setText}
-        onSubmit={onSubmit}
-        onStop={onStop}
-      />
+        <section className="messages" aria-live="polite" ref={messagesRef}>
+          <div className="messages-inner">
+            {messages.length === 0 && (
+              <div style={{
+                textAlign: "center", color: "var(--muted)", marginTop: "60px",
+                fontSize: "0.95rem",
+              }}>
+                Selecione uma conversa ou inicie uma nova.
+              </div>
+            )}
+            {messages.map((msg) => (
+              <article key={msg.id} className={`bubble ${msg.role}`}>
+                <MessageContent content={msg.content} />
+              </article>
+            ))}
+          </div>
+        </section>
 
-      <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
-    </main>
+        <Composer
+          text={text}
+          busy={busy}
+          error={error}
+          onChangeText={setText}
+          onSubmit={onSubmit}
+          onStop={onStop}
+        />
+
+        <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
+      </main>
+    </div>
   );
 }
 
