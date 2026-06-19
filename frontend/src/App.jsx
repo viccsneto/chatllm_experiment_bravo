@@ -1,22 +1,43 @@
-const { useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState, useCallback } = React;
 
 function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function App() {
-  const [messages, setMessages] = useState([
-    {
-      id: createMessageId(),
-      role: "assistant",
-      content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
-    },
-  ]);
+  const [user, setUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const messagesRef = useRef(null);
   const abortControllerRef = useRef(null);
+
+  // Check if user is already logged in on mount
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      apiGetMe()
+        .then((userData) => {
+          setUser(userData);
+          setMessages([
+            {
+              id: createMessageId(),
+              role: "assistant",
+              content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+            },
+          ]);
+        })
+        .catch(() => {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("user_email");
+        })
+        .finally(() => setCheckingAuth(false));
+    } else {
+      setCheckingAuth(false);
+    }
+  }, []);
 
   const chatHistory = useMemo(
     () => messages.filter((msg) => msg.role === "user" || msg.role === "assistant"),
@@ -108,10 +129,62 @@ function App() {
     }
   };
 
+  const handleAuthSuccess = useCallback((userData) => {
+    setUser(userData);
+    setMessages([
+      {
+        id: createMessageId(),
+        role: "assistant",
+        content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+      },
+    ]);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await apiLogout();
+    } catch {
+      // Ignore logout errors
+    }
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user_email");
+    setUser(null);
+    setMessages([]);
+  };
+
+  if (checkingAuth) {
+    return (
+      <main className="app-shell">
+        <div className="auth-container">
+          <div className="auth-card">
+            <p className="auth-subtitle">Carregando...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
         <div className="brand">ChatLLM Lab</div>
+        <div className="header-right">
+          <span className="user-email" title={user.email}>
+            {user.email}
+          </span>
+          <button className="logout-btn" onClick={handleLogout} title="Sair">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+              <polyline points="10,12 14,8 10,4" />
+              <line x1="14" y1="8" x2="6" y2="8" />
+            </svg>
+            Sair
+          </button>
+        </div>
       </header>
 
       <section className="messages" aria-live="polite" ref={messagesRef}>
@@ -133,7 +206,7 @@ function App() {
         onStop={onStop}
       />
 
-      <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
+      <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
     </main>
   );
 }

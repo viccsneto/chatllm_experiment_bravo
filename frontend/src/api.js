@@ -56,3 +56,51 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
     }
   }
 }
+
+// ─── Auth API ────────────────────────────────────────────────────────────────
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function apiRegister(email, password) {
+  const response = await fetch(`${API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Erro ao cadastrar.");
+  return data;
+}
+
+async function apiLogin(email, password) {
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Erro ao fazer login.");
+  return data;
+}
+
+async function apiLogout() {
+  const response = await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Erro ao fazer logout.");
+  return data;
+}
+
+async function apiGetMe() {
+  const response = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { ...getAuthHeaders() },
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Erro ao obter usuario.");
+  return data;
+}
