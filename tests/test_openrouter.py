@@ -7,7 +7,7 @@ import pytest
 from backend.services.openrouter import (
     OpenRouterConfigError,
     _build_messages,
-    _build_headers,
+    build_headers,
     generate_reply,
     stream_reply,
 )
@@ -67,7 +67,7 @@ class TestBuildMessages:
 
 class TestBuildHeaders:
     def test_build_headers_structure(self):
-        headers = _build_headers()
+        headers = build_headers()
         assert "Authorization" in headers
         assert headers["Authorization"].startswith("Bearer ")
         assert headers["Content-Type"] == "application/json"

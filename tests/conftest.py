@@ -8,6 +8,8 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database import Base, get_db
 from backend.main import app
+from backend.models import User
+from backend.services.auth import hash_password
 
 
 @pytest.fixture(scope="session")
@@ -65,3 +67,33 @@ def client(db_session):
         yield test_client
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def test_user(db_session):
+    """Cria um usuario de teste e retorna seus dados."""
+    user = User(
+        email="teste@teste.com",
+        hashed_password=hash_password("123456"),
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def auth_token(client, test_user):
+    """Retorna um token JWT valido para o usuario de teste."""
+    response = client.post(
+        "/api/auth/login",
+        json={"email": "teste@teste.com", "password": "123456"},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    """Retorna headers de autenticacao para requisicoes."""
+    return {"Authorization": f"Bearer {auth_token}"}

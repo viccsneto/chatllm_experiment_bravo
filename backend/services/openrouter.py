@@ -32,7 +32,7 @@ def _build_messages(*, user_message: str, history: list[dict]) -> list[dict]:
     return messages
 
 
-def _build_headers() -> dict[str, str]:
+def build_headers() -> dict[str, str]:
     return {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -56,7 +56,7 @@ async def generate_reply(*, user_message: str, history: list[dict], model: str |
     }
 
     async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(OPENROUTER_API_URL, json=payload, headers=_build_headers())
+        response = await client.post(OPENROUTER_API_URL, json=payload, headers=build_headers())
 
     if response.status_code >= 400:
         raise RuntimeError(f"OpenRouter retornou erro {response.status_code}: {response.text}")
@@ -85,7 +85,7 @@ async def stream_reply(*, user_message: str, history: list[dict], model: str | N
     }
 
     async with httpx.AsyncClient(timeout=90.0) as client:
-        async with client.stream("POST", OPENROUTER_API_URL, json=payload, headers=_build_headers()) as response:
+        async with client.stream("POST", OPENROUTER_API_URL, json=payload, headers=build_headers()) as response:
             if response.status_code >= 400:
                 body = await response.aread()
                 raise RuntimeError(
