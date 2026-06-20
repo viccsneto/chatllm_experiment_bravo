@@ -5,17 +5,21 @@
 **Hard rule**: AI agents must not edit this file and must not draft paste-ready content for it.
 
 ## The Problem
-_State clearly what you are trying to achieve and the architectural constraints, avoiding implementation specifics of HOW to do it. Focus on WHAT and WHY._
+Implementar um sistema de persistência de chat onde cada sessão é vinculada exclusivamente ao usuário autenticado. O objetivo é permitir que o usuário gerencie seu histórico e identifique conversas rapidamente através de títulos gerados automaticamente, evitando a sobrecarga cognitiva de lidar com múltiplos chats sem nomes.
 
 ## Steps
-- [ ] _Decompose the problem into actionable logical steps._
-- [ ] _Each step should represent a verifiable piece of work._
+- [ ] Modelar o banco de dados para associar chats e mensagens ao user_id da Tabela de Usuários.
+- [ ] Criar o endpoint de criação de sessão que salva o histórico inicial.
+- [ ] Implementar a lógica que extrai um título a partir da primeira interação (via LLM) e atualiza o registro do chat.
+- [ ] Implementar o endpoint de listagem que retorna apenas os chats pertencentes ao usuário logado.
 
 ## Success Looks Like
-- [ ] _Define rigorous, observable criteria for success. E.g., The endpoint returns 200 OK with the user object, NOT Code compiles_
+- [ ] O sistema retorna 200 OK apenas com os chats do user_id atual, garantindo isolamento total de dados.
+- [ ] A primeira interação do usuário dispara automaticamente a geração e o salvamento do título no banco.
+- [ ] O frontend exibe a lista de chats com títulos legíveis, carregados corretamente do backend.
 
 ## Notes
-- [ ] _Any specific edge cases, libraries to consider, or potential pitfalls._
+- [ ] O título deve ser gerado apenas uma vez no inicio da conversa com o chat
 
 ---
 **⚠️ HUMAN ONLY**: This file is your strategic space. AI agents must not edit it.

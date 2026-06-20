@@ -5,25 +5,24 @@
 **Hard rule**: AI agents must not edit this file and must not draft paste-ready content for it.
 
 ## R — Repeat (The Problem)
-_State the problem in your own words. Confirm that you share the same mental model of the goal._
+Implementar Titulod a conversa com o chat de forma dinamica a primeira interação do usuario.
 
 ## E — Examples
-_Provide concrete inputs and expected outputs that demonstrate the correctness. Base them on observable behavior._
+_Provide concrete inputs and expected outputs that demonstrate the correctness. Base them on observable behavior.
+- Input:Explique o que é Python
+  Output: o que é Python ?
 
-- **Happy Path Input**: ...
-  **Output**: ...
-
-- **Edge Case Input**: ...
-  **Output**: ...
+- Input:Me explique o porque o céu tem a cor azul
+  Output: Porque o céu é azul ?
 
 ## A — Approach
-_Describe your high-level strategy conceptually. How did you design the solution?_
+Foi usado o Medelo CRUD para o Bancod e dados, e foi seguido a arquitetura ja preexistente do sistema, mantendo o desemcapsulamento.
 
 ## C — Code
-_Identify the most critical code changes, format as actual files, functions, or methods. Justify the intent of your design choices rather than just acknowledging the syntax changes._
+Foi criado ChatSession mo models.py, foi adicionado no Front o component de SideBar, e controle de seção com o arquivo sessions.py.
 
 ## T — Tests
-_Explain how the solution was validated, pointing to the actual test files, functions, or methods. Document any manual or automated tests._
+O Copilot abriu o navedaor na propia IDE e eu pude criar novas sessões de chat e fiz perguntas par averificar se seria alterado o titulo do chat no side bar.
 
 ## O — Optimize
-_Address Big(O) complexity, note that sometimes it doesn't apply, trade-offs, constraints, and opportunities for future improvement._
+Não foi impelmentado de Edição do titulo do chat, ou "pinar" o chat como é possivel em outras ferramenteas ja existentes
