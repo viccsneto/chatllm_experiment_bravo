@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from backend.services.openrouter import (
@@ -171,6 +172,19 @@ class TestGenerateReply:
                 with pytest.raises(RuntimeError, match="nao retornou conteudo"):
                     await generate_reply(user_message="Teste", history=[])
 
+    @pytest.mark.asyncio
+    async def test_raises_on_request_error(self):
+        """Deve lancar RuntimeError quando httpx.RequestError ocorre (ex: sem rede)."""
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(side_effect=httpx.RequestError("Connection refused"))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("backend.services.openrouter.OPENROUTER_API_KEY", "sk-test"):
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                with pytest.raises(RuntimeError, match="Nao foi possivel conectar"):
+                    await generate_reply(user_message="Teste", history=[])
+
 
 class TestStreamReply:
     @pytest.mark.asyncio
@@ -262,3 +276,19 @@ class TestStreamReply:
                     deltas.append(delta)
 
                 assert deltas == ["valido"]
+
+    @pytest.mark.asyncio
+    async def test_raises_on_request_error_during_stream(self):
+        """Deve lancar RuntimeError quando httpx.RequestError ocorre no stream."""
+        mock_client = MagicMock()
+        mock_client.stream = MagicMock(
+            side_effect=httpx.RequestError("Connection refused")
+        )
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("backend.services.openrouter.OPENROUTER_API_KEY", "sk-test"):
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                with pytest.raises(RuntimeError, match="Nao foi possivel conectar"):
+                    async for _ in stream_reply(user_message="Teste", history=[]):
+                        pass

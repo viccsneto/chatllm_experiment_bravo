@@ -1,9 +1,77 @@
 const API_BASE = window.location.origin;
 
+const TOKEN_KEY = "chatllm_token";
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function authHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function apiPost(path, body, extraHeaders = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...extraHeaders },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Erro ${response.status}`);
+  }
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+async function apiGet(path) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { ...authHeaders() },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Erro ${response.status}`);
+  }
+  return response.json();
+}
+
+async function signup(email, password) {
+  const data = await apiPost("/api/signup", { email, password });
+  setToken(data.access_token);
+  return data;
+}
+
+async function login(email, password) {
+  const data = await apiPost("/api/login", { email, password });
+  setToken(data.access_token);
+  return data;
+}
+
+async function logout() {
+  try {
+    await apiPost("/api/logout", {}, authHeaders());
+  } finally {
+    clearToken();
+  }
+}
+
+async function getMe() {
+  return apiGet("/api/me");
+}
+
 async function sendMessageStream({ message, history, onDelta, signal }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ message, history }),
     signal,
   });

@@ -4,7 +4,95 @@ function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function AuthScreen({ onAuthSuccess }) {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        await login(email, password);
+      } else {
+        await signup(email, password);
+      }
+      onAuthSuccess();
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-screen">
+      <div className="auth-box">
+        <h2>{mode === "login" ? "Entrar" : "Criar Conta"}</h2>
+        <p className="subtitle">
+          {mode === "login"
+            ? "Acesse o ChatLLM Lab com seu email."
+            : "Cadastre-se para usar o ChatLLM Lab."}
+        </p>
+        <form onSubmit={handleSubmit}>
+          <div className="auth-field">
+            <label htmlFor="auth-email">Email</label>
+            <input
+              id="auth-email"
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="auth-field">
+            <label htmlFor="auth-password">Senha</label>
+            <input
+              id="auth-password"
+              type="password"
+              placeholder="Minimo 6 caracteres"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+          </div>
+          <button className="auth-btn" type="submit" disabled={loading}>
+            {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Cadastrar"}
+          </button>
+          {authError && <p className="auth-error">{authError}</p>}
+        </form>
+        <div className="auth-switch">
+          {mode === "login" ? (
+            <>
+              Nao tem conta?{" "}
+              <button type="button" onClick={() => { setMode("signup"); setAuthError(""); }}>
+                Cadastre-se
+              </button>
+            </>
+          ) : (
+            <>
+              Ja tem conta?{" "}
+              <button type="button" onClick={() => { setMode("login"); setAuthError(""); }}>
+                Faca login
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  const [user, setUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [messages, setMessages] = useState([
     {
       id: createMessageId(),
@@ -29,10 +117,33 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
+    (async () => {
+      if (getToken()) {
+        try {
+          const me = await getMe();
+          setUser(me);
+        } catch {
+          clearToken();
+        }
+      }
+      setCheckingAuth(false);
+    })();
     return () => {
       abortControllerRef.current?.abort();
     };
   }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    setMessages([
+      {
+        id: createMessageId(),
+        role: "assistant",
+        content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+      },
+    ]);
+  };
 
   const onStop = () => {
     abortControllerRef.current?.abort();
@@ -108,10 +219,40 @@ function App() {
     }
   };
 
+  if (checkingAuth) {
+    return (
+      <main className="app-shell">
+        <div className="auth-screen">
+          <p>Verificando sessao...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="app-shell">
+        <AuthScreen onAuthSuccess={async () => {
+          try {
+            const me = await getMe();
+            setUser(me);
+          } catch {
+            clearToken();
+          }
+        }} />
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
-        <div className="brand">ChatLLM Lab</div>
+        <div className="app-header-inner">
+          <div className="brand">ChatLLM Lab</div>
+          <button className="logout-btn" onClick={handleLogout}>
+            Sair ({user.email})
+          </button>
+        </div>
       </header>
 
       <section className="messages" aria-live="polite" ref={messagesRef}>
