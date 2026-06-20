@@ -5,6 +5,8 @@ function createMessageId() {
 }
 
 function App() {
+  const [userEmail, setUserEmail] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const [messages, setMessages] = useState([
     {
       id: createMessageId(),
@@ -17,6 +19,33 @@ function App() {
   const [error, setError] = useState("");
   const messagesRef = useRef(null);
   const abortControllerRef = useRef(null);
+
+  useEffect(() => {
+    apiMe().then((user) => {
+      if (user) setUserEmail(user.email);
+    }).finally(() => setLoadingAuth(false));
+  }, []);
+
+  const handleAuth = (email) => {
+    setUserEmail(email);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await apiAuth("logout", {});
+    } catch {
+      // Ignorar erros no logout
+    }
+    clearToken();
+    setUserEmail(null);
+    setMessages([
+      {
+        id: createMessageId(),
+        role: "assistant",
+        content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+      },
+    ]);
+  };
 
   const chatHistory = useMemo(
     () => messages.filter((msg) => msg.role === "user" || msg.role === "assistant"),
@@ -108,10 +137,32 @@ function App() {
     }
   };
 
+  if (loadingAuth) {
+    return (
+      <main className="app-shell">
+        <div className="auth-container">
+          <div className="auth-card">
+            <p style={{ textAlign: "center", color: "var(--muted)" }}>Carregando...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!userEmail) {
+    return <Auth onAuth={handleAuth} />;
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
-        <div className="brand">ChatLLM Lab</div>
+        <span className="brand">ChatLLM Lab</span>
+        <div className="header-right">
+          <span className="header-email">{userEmail}</span>
+          <button type="button" className="logout-btn" onClick={handleLogout}>
+            Sair
+          </button>
+        </div>
       </header>
 
       <section className="messages" aria-live="polite" ref={messagesRef}>
