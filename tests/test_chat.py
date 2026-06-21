@@ -58,13 +58,13 @@ class TestChatStreamEndpoint:
         assert response.status_code == 401
 
     def test_chat_stream_authenticated(self, client: TestClient, auth_headers: dict):
-        """Com token valido, /api/chat/stream inicia (200) e erro de config vai no body."""
+        """Com token valido, /api/chat/stream inicia (200)."""
         response = client.post(
             "/api/chat/stream",
             json={"message": "Ola"},
             headers=auth_headers,
         )
-        # O streaming inicia com 200; o erro de chave OpenRouter vai no evento SSE
+        # O streaming inicia com 200
         assert response.status_code == 200
 
     def test_chat_stream_empty_message_rejected(self, client: TestClient, auth_headers: dict):

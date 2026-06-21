@@ -22,7 +22,7 @@ function authHeaders() {
 async function apiPost(path, body, extraHeaders = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...extraHeaders },
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...extraHeaders },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -68,11 +68,39 @@ async function getMe() {
   return apiGet("/api/me");
 }
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
+async function listSessions() {
+  return apiGet("/api/sessions");
+}
+
+async function createSession() {
+  return apiPost("/api/sessions", {});
+}
+
+async function getSessionMessages(sessionId) {
+  return apiGet(`/api/sessions/${sessionId}/messages`);
+}
+
+async function apiDelete(path) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Erro ${response.status}`);
+  }
+  return null;
+}
+
+async function deleteSession(sessionId) {
+  return apiDelete(`/api/sessions/${sessionId}`);
+}
+
+async function sendMessageStream({ message, history, session_id, onDelta, onDone, signal }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, session_id }),
     signal,
   });
 
@@ -120,6 +148,10 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
 
       if (payload.delta) {
         onDelta(payload.delta);
+      }
+
+      if (payload.done && onDone) {
+        onDone(payload.session_id);
       }
     }
   }

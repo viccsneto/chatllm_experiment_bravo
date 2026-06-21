@@ -93,13 +93,9 @@ function AuthScreen({ onAuthSuccess }) {
 function App() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [messages, setMessages] = useState([
-    {
-      id: createMessageId(),
-      role: "assistant",
-      content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
-    },
-  ]);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -122,6 +118,16 @@ function App() {
         try {
           const me = await getMe();
           setUser(me);
+          const sess = await listSessions();
+          setSessions(sess);
+          const lastId = localStorage.getItem("chatllm_session_id");
+          if (lastId && sess.some((s) => s.id === Number(lastId))) {
+            setCurrentSessionId(Number(lastId));
+            const msgs = await getSessionMessages(Number(lastId));
+            setMessages(msgs.map((m) => ({ id: `srv-${m.id}`, role: m.role, content: m.content })));
+          } else if (sess.length > 0) {
+            await selectSessionByData(sess[0].id, sess);
+          }
         } catch {
           clearToken();
         }
@@ -133,16 +139,49 @@ function App() {
     };
   }, []);
 
-  const handleLogout = async () => {
-    await logout();
-    setUser(null);
-    setMessages([
-      {
+  const selectSessionByData = async (id, sessList) => {
+    setCurrentSessionId(id);
+    localStorage.setItem("chatllm_session_id", id);
+    const msgs = await getSessionMessages(id);
+    if (msgs.length > 0) {
+      setMessages(msgs.map((m) => ({ id: `srv-${m.id}`, role: m.role, content: m.content })));
+    } else {
+      setMessages([{
         id: createMessageId(),
         role: "assistant",
         content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
-      },
-    ]);
+      }]);
+    }
+  };
+
+  const handleNewSession = async () => {
+    const sess = await createSession();
+    setSessions((prev) => [sess, ...prev]);
+    await selectSessionByData(sess.id, [sess, ...sessions]);
+  };
+
+  const handleDeleteSession = async (id) => {
+    await deleteSession(id);
+    const updated = sessions.filter((s) => s.id !== id);
+    setSessions(updated);
+    if (currentSessionId === id) {
+      if (updated.length > 0) {
+        await selectSessionByData(updated[0].id, updated);
+      } else {
+        setCurrentSessionId(null);
+        setMessages([]);
+        localStorage.removeItem("chatllm_session_id");
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    setSessions([]);
+    setCurrentSessionId(null);
+    setMessages([]);
+    localStorage.removeItem("chatllm_session_id");
   };
 
   const onStop = () => {
@@ -174,6 +213,7 @@ function App() {
       await sendMessageStream({
         message: cleaned,
         history: chatHistory,
+        session_id: currentSessionId,
         signal: abortController.signal,
         onDelta: (delta) => {
           setMessages((prev) =>
@@ -183,6 +223,15 @@ function App() {
                 : msg
             )
           );
+        },
+        onDone: (sessionId) => {
+          // Se a sessao foi criada automaticamente, adota-la
+          if (sessionId && !currentSessionId) {
+            setCurrentSessionId(sessionId);
+            localStorage.setItem("chatllm_session_id", sessionId);
+          }
+          // refresh sidebar titles after response
+          listSessions().then(setSessions);
         },
       });
 
@@ -236,6 +285,11 @@ function App() {
           try {
             const me = await getMe();
             setUser(me);
+            const sess = await listSessions();
+            setSessions(sess);
+            if (sess.length > 0) {
+              await selectSessionByData(sess[0].id, sess);
+            }
           } catch {
             clearToken();
           }
@@ -246,35 +300,60 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div className="brand">ChatLLM Lab</div>
-          <button className="logout-btn" onClick={handleLogout}>
-            Sair ({user.email})
-          </button>
-        </div>
-      </header>
-
-      <section className="messages" aria-live="polite" ref={messagesRef}>
-        <div className="messages-inner">
-          {messages.map((msg) => (
-            <article key={msg.id} className={`bubble ${msg.role}`}>
-              <MessageContent content={msg.content} />
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <Composer
-        text={text}
-        busy={busy}
-        error={error}
-        onChangeText={setText}
-        onSubmit={onSubmit}
-        onStop={onStop}
+      <Sidebar
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onSelectSession={(id) => {
+          if (busy) return; // bloqueia troca durante streaming
+          const list = sessions;
+          setCurrentSessionId(id);
+          localStorage.setItem("chatllm_session_id", id);
+          getSessionMessages(id).then((msgs) => {
+            if (msgs.length > 0) {
+              setMessages(msgs.map((m) => ({ id: `srv-${m.id}`, role: m.role, content: m.content })));
+            } else {
+              setMessages([{
+                id: createMessageId(),
+                role: "assistant",
+                content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+              }]);
+            }
+          });
+        }}
+        onNewSession={handleNewSession}
+        onDeleteSession={handleDeleteSession}
       />
+      <div className="chat-area">
+        <header className="app-header">
+          <div className="app-header-inner">
+            <div className="brand">ChatLLM Lab</div>
+            <button className="logout-btn" onClick={handleLogout}>
+              Sair ({user.email})
+            </button>
+          </div>
+        </header>
 
-      <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
+        <section className="messages" aria-live="polite" ref={messagesRef}>
+          <div className="messages-inner">
+            {messages.map((msg) => (
+              <article key={msg.id} className={`bubble ${msg.role}`}>
+                <MessageContent content={msg.content} />
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <Composer
+          text={text}
+          busy={busy}
+          error={error}
+          onChangeText={setText}
+          onSubmit={onSubmit}
+          onStop={onStop}
+        />
+
+        <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
+      </div>
     </main>
   );
 }
