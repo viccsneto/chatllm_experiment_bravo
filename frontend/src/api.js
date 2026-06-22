@@ -56,3 +56,75 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
     }
   }
 }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+const TOKEN_KEY = "chatllm_token";
+
+function saveToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function isAuthenticated() {
+  return !!getToken();
+}
+
+async function signup(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Erro ao cadastrar.");
+  }
+  const data = await res.json();
+  saveToken(data.access_token);
+  return data;
+}
+
+async function login(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Erro ao fazer login.");
+  }
+  const data = await res.json();
+  saveToken(data.access_token);
+  return data;
+}
+
+async function logout() {
+  try {
+    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
+  } catch {
+    // Ignora erro de rede no logout
+  }
+  clearToken();
+}
+
+async function getMe() {
+  const token = getToken();
+  if (!token) return null;
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    clearToken();
+    return null;
+  }
+  return res.json();
+}

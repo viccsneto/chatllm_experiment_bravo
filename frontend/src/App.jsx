@@ -5,6 +5,10 @@ function createMessageId() {
 }
 
 function App() {
+  // Auth state: null = loading, { id, email } = autenticado, false = nao autenticado
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [messages, setMessages] = useState([
     {
       id: createMessageId(),
@@ -33,6 +37,59 @@ function App() {
       abortControllerRef.current?.abort();
     };
   }, []);
+
+  // Verificar autenticacao ao montar o componente
+  useEffect(() => {
+    if (isAuthenticated()) {
+      getMe().then((u) => {
+        if (u) {
+          setUser(u);
+        } else {
+          clearToken();
+        }
+        setAuthLoading(false);
+      });
+    } else {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  const onAuthSuccess = () => {
+    getMe().then((u) => {
+      if (u) setUser(u);
+    });
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    setMessages([
+      {
+        id: createMessageId(),
+        role: "assistant",
+        content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+      },
+    ]);
+  };
+
+  if (authLoading) {
+    return (
+      <main className="app-shell">
+        <header className="app-header">
+          <div className="brand">ChatLLM Lab</div>
+        </header>
+        <div className="auth-page">
+          <div className="auth-card" style={{ textAlign: "center", padding: "40px 0" }}>
+            Carregando...
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage onAuthSuccess={onAuthSuccess} />;
+  }
 
   const onStop = () => {
     abortControllerRef.current?.abort();
@@ -112,6 +169,12 @@ function App() {
     <main className="app-shell">
       <header className="app-header">
         <div className="brand">ChatLLM Lab</div>
+        <div className="header-user">
+          <span className="header-email">{user.email}</span>
+          <button type="button" className="header-logout" onClick={handleLogout}>
+            Sair
+          </button>
+        </div>
       </header>
 
       <section className="messages" aria-live="polite" ref={messagesRef}>
@@ -133,7 +196,7 @@ function App() {
         onStop={onStop}
       />
 
-      <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
+      <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
     </main>
   );
 }
