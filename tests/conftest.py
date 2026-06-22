@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import bcrypt
 import pytest
 from fastapi.testclient import TestClient
+from jose import jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from backend.config import JWT_ALGORITHM, JWT_SECRET_KEY
 from backend.database import Base, get_db
 from backend.main import app
+from backend.models import User
+from backend.routers.auth import get_current_user
+
+
+TEST_USER_EMAIL = "test@exemplo.com"
+TEST_USER_PASSWORD = "senha123"
 
 
 @pytest.fixture(scope="session")
@@ -30,11 +39,7 @@ def tables(engine):
 
 @pytest.fixture
 def db_session(engine, tables):
-    """Retorna uma sessao de banco limpa para cada teste.
-
-    Usa transacao aninhada (SAVEPOINT) para isolar cada teste.
-    Ao final do teste, o rollback desfaz todas as alteracoes.
-    """
+    """Retorna uma sessao de banco limpa para cada teste."""
     connection = engine.connect()
     transaction = connection.begin()
 
@@ -47,6 +52,34 @@ def db_session(engine, tables):
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def test_user(db_session):
+    """Cria um usuario de teste no banco."""
+    user = User(
+        email=TEST_USER_EMAIL,
+        password_hash=bcrypt.hashpw(TEST_USER_PASSWORD.encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def user_token(test_user):
+    """Gera um token JWT valido para o usuario de teste."""
+    from datetime import datetime, timedelta, timezone
+
+    expire = datetime.now(timezone.utc) + timedelta(hours=1)
+    return jwt.encode({"sub": test_user.email, "exp": expire}, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+@pytest.fixture
+def auth_headers(user_token):
+    """Retorna headers de autenticacao Bearer."""
+    return {"Authorization": f"Bearer {user_token}"}
 
 
 @pytest.fixture
