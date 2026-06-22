@@ -66,13 +66,48 @@ async function fetchMe() {
   return data;
 }
 
+/* ── Sessions ─────────────────────────────────────────────── */
+
+async function fetchSessions() {
+  const response = await authFetch("/api/sessions");
+  if (!response.ok) throw new Error("Erro ao carregar sessoes");
+  return response.json();
+}
+
+async function createSession() {
+  const response = await authFetch("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw new Error("Erro ao criar sessao");
+  return response.json();
+}
+
+async function renameSession(sessionId, title) {
+  const response = await authFetch(`/api/sessions/${sessionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw new Error("Erro ao renomear sessao");
+  return response.json();
+}
+
+async function deleteSession(sessionId) {
+  const response = await authFetch(`/api/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Erro ao deletar sessao");
+}
+
 /* ── Chat ────────────────────────────────────────────────── */
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
-  const response = await fetch(`${API_BASE}/api/chat/stream`, {
+async function sendMessageStream({ message, session_id, history, onDelta, signal }) {
+  const payload = { message, history };
+  if (session_id != null) payload.session_id = session_id;
+
+  const response = await authFetch("/api/chat/stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(payload),
     signal,
   });
 
