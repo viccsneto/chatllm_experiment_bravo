@@ -1,10 +1,10 @@
-const { useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState, useCallback } = React;
 
 function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function App() {
+function ChatApp({ user, onLogout }) {
   const [messages, setMessages] = useState([
     {
       id: createMessageId(),
@@ -108,10 +108,21 @@ function App() {
     }
   };
 
+  const handleLogoutClick = async () => {
+    await logout();
+    onLogout();
+  };
+
   return (
     <main className="app-shell">
       <header className="app-header">
         <div className="brand">ChatLLM Lab</div>
+        <div className="header-right">
+          <span className="user-email">{user.email}</span>
+          <button className="logout-btn" onClick={handleLogoutClick} title="Sair">
+            Sair
+          </button>
+        </div>
       </header>
 
       <section className="messages" aria-live="polite" ref={messagesRef}>
@@ -133,11 +144,44 @@ function App() {
         onStop={onStop}
       />
 
-      <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
+      <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
     </main>
   );
 }
 
+function AppWrapper() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      fetchMe().then((me) => {
+        if (me) setUser(me);
+        setChecking(false);
+      }).catch(() => setChecking(false));
+    } else {
+      setChecking(false);
+    }
+  }, []);
+
+  const handleAuthSuccess = useCallback((me) => setUser(me), []);
+  const handleLogout = useCallback(() => setUser(null), []);
+
+  if (checking) {
+    return (
+      <main className="app-shell">
+        <div className="loading-screen">Carregando...</div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  return <ChatApp user={user} onLogout={handleLogout} />;
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+root.render(<AppWrapper />);
 
