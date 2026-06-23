@@ -1,9 +1,75 @@
 const API_BASE = window.location.origin;
 
+// ── Auth ──────────────────────────────────────────────
+
+function getToken() {
+  return localStorage.getItem("access_token");
+}
+
+function setToken(token) {
+  localStorage.setItem("access_token", token);
+}
+
+function clearToken() {
+  localStorage.removeItem("access_token");
+}
+
+function authHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function apiRegister(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Erro ao cadastrar.");
+  setToken(data.access_token);
+  return data;
+}
+
+async function apiLogin(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Erro ao fazer login.");
+  setToken(data.access_token);
+  return data;
+}
+
+async function apiLogout() {
+  const res = await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  clearToken();
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Erro ao fazer logout.");
+  }
+  return res.json();
+}
+
+async function apiMe() {
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// ── Chat ──────────────────────────────────────────────
+
 async function sendMessageStream({ message, history, onDelta, signal }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ message, history }),
     signal,
   });

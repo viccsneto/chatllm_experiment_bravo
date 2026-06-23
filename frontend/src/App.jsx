@@ -4,7 +4,97 @@ function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function App() {
+// ── Auth Screen ───────────────────────────────────────
+
+function AuthScreen() {
+  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        await apiLogin(email, password);
+      } else {
+        await apiRegister(email, password);
+      }
+      // Recarrega a página para o App detectar o token
+      window.location.reload();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <div className="brand">ChatLLM Lab</div>
+      </header>
+      <div className="auth-container">
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <h2>{mode === "login" ? "Entrar" : "Criar Conta"}</h2>
+
+          <label htmlFor="auth-email">Email</label>
+          <input
+            id="auth-email"
+            type="email"
+            placeholder="seu@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+          />
+
+          <label htmlFor="auth-password">Senha</label>
+          <input
+            id="auth-password"
+            type="password"
+            placeholder="Minimo 6 caracteres"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+          />
+
+          {error && <div className="auth-error">{error}</div>}
+
+          <button type="submit" disabled={loading}>
+            {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Cadastrar"}
+          </button>
+
+          <p className="auth-toggle">
+            {mode === "login" ? (
+              <>
+                Nao tem conta?{" "}
+                <a href="#" onClick={(e) => { e.preventDefault(); setMode("register"); setError(""); }}>
+                  Cadastre-se
+                </a>
+              </>
+            ) : (
+              <>
+                Ja tem conta?{" "}
+                <a href="#" onClick={(e) => { e.preventDefault(); setMode("login"); setError(""); }}>
+                  Fazer login
+                </a>
+              </>
+            )}
+          </p>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+// ── Chat Screen ──────────────────────────────────────
+
+function ChatScreen({ user, onLogout }) {
   const [messages, setMessages] = useState([
     {
       id: createMessageId(),
@@ -112,6 +202,10 @@ function App() {
     <main className="app-shell">
       <header className="app-header">
         <div className="brand">ChatLLM Lab</div>
+        <div className="header-right">
+          <span className="user-email">{user.email}</span>
+          <button className="btn-logout" onClick={onLogout}>Logout</button>
+        </div>
       </header>
 
       <section className="messages" aria-live="polite" ref={messagesRef}>
@@ -133,9 +227,58 @@ function App() {
         onStop={onStop}
       />
 
-      <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
+      <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
     </main>
   );
+}
+
+// ── App (root) ────────────────────────────────────────
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (getToken()) {
+      apiMe().then((u) => {
+        setUser(u);
+        setLoading(false);
+      }).catch(() => {
+        clearToken();
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await apiLogout();
+    } catch {
+      clearToken();
+    }
+    window.location.reload();
+  };
+
+  if (loading) {
+    return (
+      <main className="app-shell">
+        <header className="app-header">
+          <div className="brand">ChatLLM Lab</div>
+        </header>
+        <div className="auth-container">
+          <p>Carregando...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  return <ChatScreen user={user} onLogout={handleLogout} />;
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
