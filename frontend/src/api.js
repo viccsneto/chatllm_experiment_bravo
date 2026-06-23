@@ -62,17 +62,45 @@ async function getMe() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Session helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+async function listSessions() {
+  return apiGet("/api/sessions");
+}
+
+async function createSession() {
+  return apiPost("/api/sessions", {});
+}
+
+async function getSessionMessages(sessionId) {
+  return apiGet(`/api/sessions/${sessionId}/messages`);
+}
+
+async function deleteSession(sessionId) {
+  const token = localStorage.getItem("session_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers,
+    credentials: "same-origin",
+  });
+  if (!res.ok) throw new Error("Erro ao remover sessao");
+}
+
+/* ------------------------------------------------------------------ */
 /*  Chat                                                                */
 /* ------------------------------------------------------------------ */
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
+async function sendMessageStream({ message, history, sessionId, onDelta, onDone, signal }) {
   const token = localStorage.getItem("session_token");
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, session_id: sessionId }),
     signal,
     credentials: "same-origin",
   });
@@ -121,6 +149,10 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
 
       if (payload.delta) {
         onDelta(payload.delta);
+      }
+
+      if (payload.done && onDone) {
+        onDone({ sessionId: payload.session_id, title: payload.title });
       }
     }
   }
