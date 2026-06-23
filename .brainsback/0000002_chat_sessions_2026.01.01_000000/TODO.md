@@ -19,3 +19,13 @@ _State clearly what you are trying to achieve and the architectural constraints,
 
 ---
 **⚠️ HUMAN ONLY**: This file is your strategic space. AI agents must not edit it.
+
+Implementar sessoes de chat e titulo automatico em uma barra lateral.
+
+Requisitos:
+1. Usuario pode criar e alternar sessoes atraves de uma barra lateral (similar a ChatGPT e Gemini).
+2. Cada sessao guarda seu historico.
+3. Se a sessao ainda nao tiver titulo, o titulo deve ser definido automaticamente com base no contexto **possivel ja na primeira resposta do modelo**.
+
+Testar toda a implementação manualmente para ver se está correta e atende aos requisitos pedidos.
+Qualquer erro que der nos testes ou no caminho de implementação, vá corrigindo um a um e testando em seguida.
