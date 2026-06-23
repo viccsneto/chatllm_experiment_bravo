@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import Base, engine
+from backend.routers.auth import router as auth_router
 from backend.routers.chat import router as chat_router
 
 
@@ -17,13 +17,49 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ChatLLM Experiment API")
 
+# CORS explicito para permitir cookies (allow_credentials=True)
+# Em producao, restrinja aos dominios reais.
+CORS_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class CSRFProtectionMiddleware(BaseHTTPMiddleware):
+    """Protecao CSRF baseada em custom header + verificacao de Origin.
+
+    SPAs que usam JSON API + custom header (X-Requested-With) disparam
+    preflight CORS, o que bloqueia automaticamente requests cross-origin
+    simples (a base do CSRF). Esta middleware faz a verificacao no servidor
+    como defesa em profundidade.
+    """
+
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method not in self.SAFE_METHODS:
+            # Verificacao 1: custom header obrigatorio (SPA envia via fetch)
+            requested_with = request.headers.get("x-requested-with", "")
+            if requested_with.lower() != "xmlhttprequest":
+                # Verificacao 2: fallback para Origin header
+                origin = request.headers.get("origin", "")
+                if not origin or origin not in CORS_ORIGINS:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "CSRF validation failed."},
+                    )
+
+        response: Response = await call_next(request)
+        return response
 
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
@@ -35,8 +71,10 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
         return response
 
 
+app.add_middleware(CSRFProtectionMiddleware)
 app.add_middleware(NoCacheMiddleware)
 
+app.include_router(auth_router)
 app.include_router(chat_router)
 
 NO_CACHE_HEADERS = {

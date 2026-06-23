@@ -1,10 +1,98 @@
-const { useEffect, useMemo, useRef, useState } = React;
+const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
 function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function App() {
+/* ── Tela de login / cadastro ──────────────────── */
+
+function AuthPage({ onAuthSuccess }) {
+  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        await apiLogin(email, password);
+      } else {
+        await apiSignup(email, password);
+      }
+      onAuthSuccess();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setMode((m) => (m === "login" ? "signup" : "login"));
+    setError("");
+  };
+
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <h1 className="auth-title">ChatLLM Lab</h1>
+        <p className="auth-subtitle">
+          {mode === "login" ? "Entre com sua conta" : "Crie sua conta"}
+        </p>
+
+        {error && <div className="auth-error">{error}</div>}
+
+        <form onSubmit={handleSubmit} className="auth-form">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+          />
+          <input
+            type="password"
+            placeholder="Senha (min. 8 caracteres)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={mode === "signup" ? 8 : 1}
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
+          </button>
+        </form>
+
+        <p className="auth-toggle">
+          {mode === "login" ? (
+            <>
+              Nao tem conta?{" "}
+              <button className="link-btn" onClick={toggleMode}>
+                Cadastre-se
+              </button>
+            </>
+          ) : (
+            <>
+              Ja tem conta?{" "}
+              <button className="link-btn" onClick={toggleMode}>
+                Fazer login
+              </button>
+            </>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Chat propriamente dito ────────────────────── */
+
+function ChatApp({ userEmail, onLogout }) {
   const [messages, setMessages] = useState([
     {
       id: createMessageId(),
@@ -15,6 +103,7 @@ function App() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
   const messagesRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -40,7 +129,7 @@ function App() {
     setBusy(false);
   };
 
-  const onSubmit = async (event, inputRef) => {
+  const onSubmit = async (event) => {
     event.preventDefault();
     const cleaned = text.trim();
     if (!cleaned || busy) return;
@@ -108,10 +197,27 @@ function App() {
     }
   };
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await apiLogout();
+      onLogout();
+    } catch (err) {
+      setError(err.message);
+      setLoggingOut(false);
+    }
+  };
+
   return (
     <main className="app-shell">
       <header className="app-header">
         <div className="brand">ChatLLM Lab</div>
+        <div className="header-user">
+          <span className="header-email" title={userEmail}>{userEmail}</span>
+          <button className="logout-btn" onClick={handleLogout} disabled={loggingOut}>
+            {loggingOut ? "Saindo..." : "Sair"}
+          </button>
+        </div>
       </header>
 
       <section className="messages" aria-live="polite" ref={messagesRef}>
@@ -133,9 +239,44 @@ function App() {
         onStop={onStop}
       />
 
-      <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
+      <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
     </main>
   );
+}
+
+/* ── App raiz ──────────────────────────────────── */
+
+function App() {
+  const [user, setUser] = useState(null); // null = carregando, false = nao logado, {email} = logado
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    apiMe().then((data) => {
+      setUser(data ? { email: data.email } : false);
+    }).catch(() => {
+      setUser(false);
+    }).finally(() => {
+      setInitialLoading(false);
+    });
+  }, []);
+
+  if (initialLoading) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <p className="auth-subtitle">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage onAuthSuccess={() => {
+      apiMe().then((data) => setUser(data ? { email: data.email } : false));
+    }} />;
+  }
+
+  return <ChatApp userEmail={user.email} onLogout={() => setUser(false)} />;
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));

@@ -51,7 +51,10 @@ def db_session(engine, tables):
 
 @pytest.fixture
 def client(db_session):
-    """Retorna um TestClient do FastAPI com o banco de testes injetado."""
+    """Retorna um TestClient do FastAPI com o banco de testes injetado.
+    
+    Inclui o header X-Requested-With para passar na protecao CSRF.
+    """
 
     def _override_get_db():
         try:
@@ -62,6 +65,9 @@ def client(db_session):
     app.dependency_overrides[get_db] = _override_get_db
 
     with TestClient(app) as test_client:
+        # TestClient nao dispara preflight CORS, entao setamos o header CSRF
+        # como default para todos os requests.
+        test_client.headers["X-Requested-With"] = "XMLHttpRequest"
         yield test_client
 
     app.dependency_overrides.clear()

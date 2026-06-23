@@ -1,9 +1,61 @@
 const API_BASE = window.location.origin;
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
-  const response = await fetch(`${API_BASE}/api/chat/stream`, {
+/** Configuracao padrao de fetch com cookies e protecao CSRF. */
+function apiFetch(url, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
+    ...options.headers,
+  };
+  return fetch(url, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+}
+
+/* ── Auth ────────────────────────────────────────── */
+
+async function apiSignup(email, password) {
+  const res = await apiFetch(`${API_BASE}/api/auth/signup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Erro no cadastro.");
+  return data;
+}
+
+async function apiLogin(email, password) {
+  const res = await apiFetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Erro no login.");
+  return data;
+}
+
+async function apiLogout() {
+  const res = await apiFetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Erro no logout.");
+  return data;
+}
+
+async function apiMe() {
+  const res = await apiFetch(`${API_BASE}/api/auth/me`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/* ── Chat ────────────────────────────────────────── */
+
+async function sendMessageStream({ message, history, onDelta, signal }) {
+  const response = await apiFetch(`${API_BASE}/api/chat/stream`, {
+    method: "POST",
     body: JSON.stringify({ message, history }),
     signal,
   });
