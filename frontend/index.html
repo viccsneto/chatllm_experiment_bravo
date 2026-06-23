@@ -64,7 +64,9 @@
         flex-shrink: 0;
         padding: 12px 24px;
         border-bottom: 1px solid var(--border);
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
 
       .brand {
@@ -72,6 +74,130 @@
         font-size: 0.95rem;
         color: var(--text);
         letter-spacing: 0;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .user-email {
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+
+      .logout-btn {
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-size: 0.82rem;
+        color: var(--text);
+        cursor: pointer;
+        transition: background 120ms ease;
+      }
+
+      .logout-btn:hover {
+        background: var(--user-bubble);
+      }
+
+      /* ── Auth Screen ────────────────────────────────────────── */
+
+      .auth-screen {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .auth-card {
+        width: 100%;
+        max-width: 380px;
+        padding: 40px 32px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        text-align: center;
+      }
+
+      .auth-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+
+      .auth-subtitle {
+        font-size: 0.92rem;
+        color: var(--muted);
+        margin: 0 0 24px;
+      }
+
+      .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .auth-input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--composer-border);
+        border-radius: 10px;
+        font: inherit;
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 150ms ease;
+        box-sizing: border-box;
+      }
+
+      .auth-input:focus {
+        border-color: #b0b0b0;
+      }
+
+      .auth-btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 120ms ease;
+        box-sizing: border-box;
+      }
+
+      .auth-btn:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+
+      .auth-btn:disabled {
+        background: #d9d9d9;
+        cursor: not-allowed;
+      }
+
+      .auth-toggle {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin: 20px 0 0;
+      }
+
+      .link-btn {
+        background: none;
+        border: none;
+        color: var(--accent);
+        font: inherit;
+        font-size: 0.85rem;
+        cursor: pointer;
+        text-decoration: underline;
+        padding: 0;
+      }
+
+      .link-btn:hover {
+        color: var(--accent-hover);
       }
 
       .messages {

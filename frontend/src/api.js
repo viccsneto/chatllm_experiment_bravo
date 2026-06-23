@@ -1,9 +1,59 @@
 const API_BASE = window.location.origin;
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+function authHeaders() {
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function registerUser(email, password) {
+  const response = await fetch(`${API_BASE}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Erro ao cadastrar.");
+  return data;
+}
+
+async function loginUser(email, password) {
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Erro ao fazer login.");
+  return data;
+}
+
+async function logoutUser() {
+  const response = await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Erro ao fazer logout.");
+  return data;
+}
+
+async function getMe() {
+  const response = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { ...authHeaders() },
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Nao autorizado.");
+  return data;
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
 async function sendMessageStream({ message, history, onDelta, signal }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ message, history }),
     signal,
   });
