@@ -1,17 +1,27 @@
-const { useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState, useCallback } = React;
 
 function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const WELCOME_MESSAGE = {
+  id: createMessageId(),
+  role: "assistant",
+  content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+};
+
 function App() {
-  const [messages, setMessages] = useState([
-    {
-      id: createMessageId(),
-      role: "assistant",
-      content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
-    },
-  ]);
+  // Auth
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Sessions
+  const [sessions, setSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  // Chat
+  const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +33,45 @@ function App() {
     [messages]
   );
 
+  const currentSession = useMemo(
+    () => sessions.find((s) => s.id === activeSessionId) || null,
+    [sessions, activeSessionId]
+  );
+
+  // ── Load sessions ─────────────────────────────────────────────────
+  const loadSessions = useCallback(async () => {
+    try {
+      const list = await listSessions();
+      setSessions(list);
+    } catch {
+      // ignora
+    }
+  }, []);
+
+  // ── Auth check ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (isAuthenticated()) {
+      getMe().then((u) => {
+        if (u) {
+          setUser(u);
+        } else {
+          clearToken();
+        }
+        setAuthLoading(false);
+      });
+    } else {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  // ── Load sessions after auth ──────────────────────────────────────
+  useEffect(() => {
+    if (user) {
+      loadSessions();
+    }
+  }, [user, loadSessions]);
+
+  // ── Scroll on new messages ────────────────────────────────────────
   useEffect(() => {
     const el = messagesRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -34,6 +83,71 @@ function App() {
     };
   }, []);
 
+  // ── Auth callbacks ────────────────────────────────────────────────
+  const onAuthSuccess = () => {
+    getMe().then((u) => {
+      if (u) setUser(u);
+    });
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    setSessions([]);
+    setActiveSessionId(null);
+    setMessages([WELCOME_MESSAGE]);
+  };
+
+  // ── Session callbacks ─────────────────────────────────────────────
+  const handleNewChat = async () => {
+    try {
+      const session = await createSession();
+      setSessions((prev) => [session, ...prev]);
+      setActiveSessionId(session.id);
+      setMessages([WELCOME_MESSAGE]);
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleSelectSession = async (sessionId) => {
+    if (busy) return;
+    setActiveSessionId(sessionId);
+    setError("");
+    try {
+      const msgs = await getSessionMessages(sessionId);
+      if (msgs.length === 0) {
+        setMessages([WELCOME_MESSAGE]);
+      } else {
+        setMessages(
+          msgs.map((m) => ({
+            id: createMessageId(),
+            role: m.role,
+            content: m.content,
+          }))
+        );
+      }
+    } catch (err) {
+      setError(err.message);
+      setMessages([WELCOME_MESSAGE]);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    try {
+      await deleteSession(sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null);
+        setMessages([WELCOME_MESSAGE]);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // ── Chat submit ───────────────────────────────────────────────────
   const onStop = () => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
@@ -60,9 +174,10 @@ function App() {
     abortControllerRef.current = abortController;
 
     try {
-      await sendMessageStream({
+      const newSessionId = await sendMessageWithSession({
         message: cleaned,
         history: chatHistory,
+        sessionId: activeSessionId,
         signal: abortController.signal,
         onDelta: (delta) => {
           setMessages((prev) =>
@@ -82,6 +197,15 @@ function App() {
             : msg
         )
       );
+
+      // Update session id after first message creates a session
+      if (!activeSessionId && newSessionId) {
+        setActiveSessionId(newSessionId);
+        loadSessions();
+      } else if (activeSessionId) {
+        // Refresh sessions list to get updated title
+        loadSessions();
+      }
     } catch (err) {
       const aborted = err?.name === "AbortError";
       if (!aborted) {
@@ -108,33 +232,70 @@ function App() {
     }
   };
 
-  return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div className="brand">ChatLLM Lab</div>
-      </header>
-
-      <section className="messages" aria-live="polite" ref={messagesRef}>
-        <div className="messages-inner">
-          {messages.map((msg) => (
-            <article key={msg.id} className={`bubble ${msg.role}`}>
-              <MessageContent content={msg.content} />
-            </article>
-          ))}
+  // ── Loading state ─────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <main className="app-shell">
+        <header className="app-header">
+          <div className="brand">ChatLLM Lab</div>
+        </header>
+        <div className="auth-page">
+          <div className="auth-card" style={{ textAlign: "center", padding: "40px 0" }}>
+            Carregando...
+          </div>
         </div>
-      </section>
+      </main>
+    );
+  }
 
-      <Composer
-        text={text}
-        busy={busy}
-        error={error}
-        onChangeText={setText}
-        onSubmit={onSubmit}
-        onStop={onStop}
+  if (!user) {
+    return <LoginPage onAuthSuccess={onAuthSuccess} />;
+  }
+
+  // ── Authenticated UI ──────────────────────────────────────────────
+  return (
+    <div className="app-layout">
+      <Sidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
       />
 
-      <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
-    </main>
+      <main className="app-shell">
+        <header className="app-header">
+          <div className="brand">ChatLLM Lab</div>
+          <div className="header-user">
+            <span className="header-email">{user.email}</span>
+            <button type="button" className="header-logout" onClick={handleLogout}>
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <section className="messages" aria-live="polite" ref={messagesRef}>
+          <div className="messages-inner">
+            {messages.map((msg) => (
+              <article key={msg.id} className={`bubble ${msg.role}`}>
+                <MessageContent content={msg.content} />
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <Composer
+          text={text}
+          busy={busy}
+          error={error}
+          onChangeText={setText}
+          onSubmit={onSubmit}
+          onStop={onStop}
+        />
+
+        <div className="warning-banner">Lembre-se, voce precisa focar no experimento!!!</div>
+      </main>
+    </div>
   );
 }
 

@@ -71,6 +71,38 @@ async def generate_reply(*, user_message: str, history: list[dict], model: str |
     return reply, resolved_model
 
 
+async def generate_title(*, conversation: list[dict]) -> str:
+    """Gera um titulo curto (max 5 palavras) para uma sessao baseado nas primeiras mensagens."""
+    if not OPENROUTER_API_KEY:
+        return "Nova conversa"
+
+    title_prompt = (
+        "Based on the conversation below, generate a very short title (maximum 5 words). "
+        "Respond with ONLY the title, no quotes, no punctuation, no explanation."
+    )
+    messages = [{"role": "system", "content": title_prompt}]
+    for msg in conversation:
+        messages.append(msg)
+
+    payload = {
+        "model": OPENROUTER_MODEL_DEFAULT,
+        "messages": messages,
+        "max_tokens": 20,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(OPENROUTER_API_URL, json=payload, headers=_build_headers())
+        if response.status_code >= 400:
+            return "Nova conversa"
+        data = response.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        title = content.strip().strip('"').strip("'")[:60]
+        return title if title else "Nova conversa"
+    except Exception:
+        return "Nova conversa"
+
+
 async def stream_reply(*, user_message: str, history: list[dict], model: str | None = None):
     if not OPENROUTER_API_KEY:
         raise OpenRouterConfigError(
