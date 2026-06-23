@@ -8,11 +8,12 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database import Base, get_db
 from backend.main import app
+from backend.models import User
+from backend.routers.auth import _create_token, pwd_context
 
 
 @pytest.fixture(scope="session")
 def engine():
-    """Cria um engine SQLite em memoria para os testes."""
     return create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -22,7 +23,6 @@ def engine():
 
 @pytest.fixture(scope="session")
 def tables(engine):
-    """Cria todas as tabelas antes dos testes e as remove ao final."""
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
@@ -30,11 +30,6 @@ def tables(engine):
 
 @pytest.fixture
 def db_session(engine, tables):
-    """Retorna uma sessao de banco limpa para cada teste.
-
-    Usa transacao aninhada (SAVEPOINT) para isolar cada teste.
-    Ao final do teste, o rollback desfaz todas as alteracoes.
-    """
     connection = engine.connect()
     transaction = connection.begin()
 
@@ -50,9 +45,24 @@ def db_session(engine, tables):
 
 
 @pytest.fixture
-def client(db_session):
-    """Retorna um TestClient do FastAPI com o banco de testes injetado."""
+def test_user(db_session):
+    email = "teste@teste.com"
+    password = "123456"
+    user = User(email=email, hashed_password=pwd_context.hash(password))
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    token = _create_token(email)
+    return {"email": email, "password": password, "token": token}
 
+
+@pytest.fixture
+def auth_headers(test_user):
+    return {"Authorization": f"Bearer {test_user['token']}"}
+
+
+@pytest.fixture
+def client(db_session):
     def _override_get_db():
         try:
             yield db_session
