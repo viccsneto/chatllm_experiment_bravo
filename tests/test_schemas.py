@@ -32,13 +32,14 @@ class TestChatMessageIn:
 
 class TestChatRequest:
     def test_valid_request_minimal(self):
-        req = ChatRequest(message="Hello")
+        req = ChatRequest(message="Hello", session_id=1)
         assert req.message == "Hello"
+        assert req.session_id == 1
         assert req.model is None
         assert req.history == []
 
     def test_valid_request_with_model(self):
-        req = ChatRequest(message="Hi", model="openai/gpt-4o")
+        req = ChatRequest(message="Hi", session_id=1, model="openai/gpt-4o")
         assert req.model == "openai/gpt-4o"
 
     def test_valid_request_with_history(self):
@@ -46,20 +47,20 @@ class TestChatRequest:
             ChatMessageIn(role="user", content="pergunta"),
             ChatMessageIn(role="assistant", content="resposta"),
         ]
-        req = ChatRequest(message="continuacao", history=history)
+        req = ChatRequest(message="continuacao", session_id=1, history=history)
         assert len(req.history) == 2
         assert req.history[0].role == "user"
 
     def test_empty_message(self):
         with pytest.raises(ValidationError):
-            ChatRequest(message="")
+            ChatRequest(message="", session_id=1)
 
     def test_message_too_long(self):
         with pytest.raises(ValidationError):
-            ChatRequest(message="x" * 8001)
+            ChatRequest(message="x" * 8001, session_id=1)
 
     def test_history_defaults_to_empty(self):
-        req = ChatRequest(message="Hello")
+        req = ChatRequest(message="Hello", session_id=1)
         assert req.history == []
 
 

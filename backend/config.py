@@ -16,3 +16,6 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SQLITE_PATH = ROOT_DIR / "database" / "chat.db"
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{SQLITE_PATH}"
+
+# Session config (OWASP recomendado: max 8h para aplicacao office-like)
+SESSION_EXPIRE_HOURS = int(os.getenv("SESSION_EXPIRE_HOURS", "8"))
