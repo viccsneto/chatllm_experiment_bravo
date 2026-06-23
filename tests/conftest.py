@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from backend.auth import create_access_token, hash_password
 from backend.database import Base, get_db
 from backend.main import app
-from backend.models import User
+from backend.models import Session, User
 
 
 @pytest.fixture(scope="session")
@@ -62,6 +62,16 @@ def test_user(db_session):
     db_session.commit()
     db_session.refresh(user)
     return user
+
+
+@pytest.fixture
+def test_session(db_session, test_user):
+    """Cria uma sessao de teste para o usuario."""
+    session = Session(user_id=test_user.id)
+    db_session.add(session)
+    db_session.commit()
+    db_session.refresh(session)
+    return session
 
 
 @pytest.fixture

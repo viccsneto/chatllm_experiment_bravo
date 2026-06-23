@@ -64,13 +64,48 @@ async function apiMe() {
   return res.json();
 }
 
+// ── Sessions ──────────────────────────────────────────
+
+async function apiListSessions() {
+  const res = await fetch(`${API_BASE}/api/sessions/`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) throw new Error("Erro ao listar sessoes.");
+  return res.json();
+}
+
+async function apiCreateSession() {
+  const res = await fetch(`${API_BASE}/api/sessions/`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) throw new Error("Erro ao criar sessao.");
+  return res.json();
+}
+
+async function apiGetSessionMessages(sessionId) {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) throw new Error("Erro ao buscar mensagens da sessao.");
+  return res.json();
+}
+
+async function apiDeleteSession(sessionId) {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) throw new Error("Erro ao deletar sessao.");
+}
+
 // ── Chat ──────────────────────────────────────────────
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
+async function sendMessageStream({ message, history, sessionId, signal, onDelta, onTitle }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, session_id: sessionId }),
     signal,
   });
 
@@ -87,6 +122,7 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
+  let lastSessionId = sessionId;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -116,9 +152,19 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
         throw new Error(payload.error);
       }
 
+      if (payload.session_id && !lastSessionId) {
+        lastSessionId = payload.session_id;
+      }
+
+      if (payload.title && onTitle) {
+        onTitle(payload.title, lastSessionId || payload.session_id);
+      }
+
       if (payload.delta) {
         onDelta(payload.delta);
       }
     }
   }
+
+  return lastSessionId;
 }

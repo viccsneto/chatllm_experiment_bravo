@@ -5,25 +5,32 @@
 **Hard rule**: AI agents must not edit this file and must not draft paste-ready content for it.
 
 ## R — Repeat (The Problem)
-_State the problem in your own words. Confirm that you share the same mental model of the goal._
+A necessidade era ter uma barra lateral para o usuário ver as sessões dele e poder alternar em sessões, cada uma tendo seu contexto e suas mensagens. O usuário pode criar novas sessões, usar uma sessão anterior, ver mensagens anteriores e excluir sessões. O título da sessão deveria ser definido automaticamente pelo modelo na primeira resposta dele.
 
 ## E — Examples
-_Provide concrete inputs and expected outputs that demonstrate the correctness. Base them on observable behavior._
+- **Input**: O usuário faz login
+  **Output**: As sessões do usuário carregam na barra lateral e ele é direcionado para uma nova sessão.
 
-- **Happy Path Input**: ...
-  **Output**: ...
+- **Input**: O usuário clica no botão para criar uma nova sessão
+  **Output**: uma nova sessão é criada na barra lateral e aberta para conversar.
 
-- **Edge Case Input**: ...
-  **Output**: ...
+- **Input**: O usuário manda uma mensagem numa sessão nova sem título.
+  **Output**: O modelo cria um título para a sessão automaticamente e responde para o usuário.
+
+- **Input**: O usuário alterna para uma sessão existente.
+  **Output**: Aparecem as mensagens dessa sessão e o contexto do chat é apenas essa sessão.
+
+- **Input**: O usuário exclui uma sessão.
+  **Output**: A sessão some da tela e é apagada do banco de dados.
 
 ## A — Approach
-_Describe your high-level strategy conceptually. How did you design the solution?_
+A sessão é definida como um modelo no banco que pertence exclusivamente a um usuário. Cada mensagem está associada a uma sessão somente. Assim, é possível o usuário buscar suas sessões, ver as mensagens específicas da sessão, excluir uma sessão e criar novas sessões com o título sendo gerado automaticamente pelo próprio modelo.
 
 ## C — Code
-_Identify the most critical code changes, format as actual files, functions, or methods. Justify the intent of your design choices rather than just acknowledging the syntax changes._
+Foi criado um modelo no backend representando uma sessão e o modelo de mensagem foi adaptado para ter uma chave estrangeira para sessão. Foi criado um novo arquivo de rotas de sessões que cuida do contexto de sessões, recebe as entradas do frontend, faz a lógica no banco e retorna para o usuário.
 
 ## T — Tests
-_Explain how the solution was validated, pointing to the actual test files, functions, or methods. Document any manual or automated tests._
+Foram realizados testes manuais da solução através da tela. Foi testado fazer login, que envia o usuário para uma nova sessão. Nessa nova sessão, foi testado a geração automática do título. Foi testado a criação de sessão a partir do botão. também foi testado se a sessão guarda o histórico apenas das mensagens dela. Também foi textado se uma sessão é excluída com sucesso. Por fim, foi testado se com outro usuário só aparecem as sessões dele e não todas as sessões existentes no banco.
 
 ## O — Optimize
-_Address Big(O) complexity, note that sometimes it doesn't apply, trade-offs, constraints, and opportunities for future improvement._
+Não foram enxergadas otimizações necessárias para a abordagem do algoritmo atual.
