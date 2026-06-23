@@ -5,25 +5,27 @@
 **Hard rule**: AI agents must not edit this file and must not draft paste-ready content for it.
 
 ## R — Repeat (The Problem)
-_State the problem in your own words. Confirm that you share the same mental model of the goal._
+O problema é que queremos adicionar uma pipeline completa para a nossa aplicação onde nela teremos o login com persistencia no banco, inicio de comversas com create e delete e, por fim, titulos automaticos.
 
 ## E — Examples
-_Provide concrete inputs and expected outputs that demonstrate the correctness. Base them on observable behavior._
 
-- **Happy Path Input**: ...
-  **Output**: ...
+- **Happy Path Input**: Criar nova conversa, depois falar algo para o modelo e aguardar resposta.
+  **Output**: Irá criar uma nova conversa, responder a pergunta do usuario e por fim criar titulo automatico do chat.
 
-- **Edge Case Input**: ...
-  **Output**: ...
+- **Edge Case Input**: O usuario ira tentar deletar um chat inexistente
+  **Output**: O back retornara um erro dizendo que não existe um chat.
 
 ## A — Approach
-_Describe your high-level strategy conceptually. How did you design the solution?_
+A solção deve ser feita fazendo os seguintes passos:
+- Criar modulos de conversas de chat, 
+- criar modulos de titulo automatico usando a resposta do modelo como contexto para cgeração do titulo
+- Criar testes para comprovar que a implementação está correta
 
 ## C — Code
-_Identify the most critical code changes, format as actual files, functions, or methods. Justify the intent of your design choices rather than just acknowledging the syntax changes._
+As mudanças mais importantes são a criação da função de endpoints para a cração e deleção de chats e a função de criar titulos automaticos de forma que use a primeira resposta do chat como requisisto.
 
 ## T — Tests
-_Explain how the solution was validated, pointing to the actual test files, functions, or methods. Document any manual or automated tests._
+Criar testes automatizados que teste o workflow da aplicação para saber se toda a implemetação, desde funções a módulos maiores, estão funcionais e copletas respeitando os requisitos do projeto.
 
 ## O — Optimize
-_Address Big(O) complexity, note that sometimes it doesn't apply, trade-offs, constraints, and opportunities for future improvement._
+Faça de forma otimizada para que nunca tenha um overhad no banco, nas chamadas dos modelos, dentre outros. Sempre leve em consideração as boas práticas de código e sua performance na criação e implementação da ideia.
