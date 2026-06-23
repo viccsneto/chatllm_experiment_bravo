@@ -64,18 +64,40 @@ async function checkAuth() {
 
 // --- Chat API ---
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
+async function listSessions() {
+  const token = getToken();
+  return await apiRequest("GET", "/api/sessions", null, token);
+}
+
+async function createSession() {
+  const token = getToken();
+  return await apiRequest("POST", "/api/sessions", {}, token);
+}
+
+async function getSessionMessages(sessionId) {
+  const token = getToken();
+  return await apiRequest("GET", `/api/sessions/${sessionId}/messages`, null, token);
+}
+
+async function deleteSession(sessionId) {
+  const token = getToken();
+  return await apiRequest("DELETE", `/api/sessions/${sessionId}`, null, token);
+}
+
+async function sendMessageStream({ message, history, sessionId, onDelta, signal }) {
+  const body = { message, history };
+  if (sessionId !== null && sessionId !== undefined) body.session_id = sessionId;
+
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(body),
     signal,
   });
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const detail = body?.detail || "Erro ao enviar mensagem para o servidor.";
-    throw new Error(detail);
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Erro ${response.status}`);
   }
 
   if (!response.body) {
@@ -85,6 +107,7 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
+  let resolvedSessionId = sessionId;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -114,9 +137,15 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
         throw new Error(payload.error);
       }
 
+      if (payload.session_id && resolvedSessionId === undefined) {
+        resolvedSessionId = payload.session_id;
+      }
+
       if (payload.delta) {
-        onDelta(payload.delta);
+        onDelta(payload.delta, resolvedSessionId);
       }
     }
   }
+
+  return resolvedSessionId;
 }
