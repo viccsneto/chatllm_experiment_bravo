@@ -1,11 +1,108 @@
 const API_BASE = window.location.origin;
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
-  const response = await fetch(`${API_BASE}/api/chat/stream`, {
+/* ------------------------------------------------------------------ */
+/*  Auth helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+async function apiPost(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history }),
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `Erro ${res.status}`);
+  return data;
+}
+
+async function apiGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: "same-origin" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `Erro ${res.status}`);
+  return data;
+}
+
+async function register(email, password) {
+  const data = await apiPost("/api/auth/register", { email, password });
+  localStorage.setItem("session_token", data.token);
+  return data;
+}
+
+async function login(email, password) {
+  const data = await apiPost("/api/auth/login", { email, password });
+  localStorage.setItem("session_token", data.token);
+  return data;
+}
+
+async function logout() {
+  const token = localStorage.getItem("session_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers,
+    credentials: "same-origin",
+  }).catch(() => {});
+  localStorage.removeItem("session_token");
+}
+
+async function getMe() {
+  const token = localStorage.getItem("session_token");
+  if (!token) return null;
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+    credentials: "same-origin",
+  });
+  if (!res.ok) {
+    localStorage.removeItem("session_token");
+    return null;
+  }
+  return res.json();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Session helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+async function listSessions() {
+  return apiGet("/api/sessions");
+}
+
+async function createSession() {
+  return apiPost("/api/sessions", {});
+}
+
+async function getSessionMessages(sessionId) {
+  return apiGet(`/api/sessions/${sessionId}/messages`);
+}
+
+async function deleteSession(sessionId) {
+  const token = localStorage.getItem("session_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers,
+    credentials: "same-origin",
+  });
+  if (!res.ok) throw new Error("Erro ao remover sessao");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Chat                                                                */
+/* ------------------------------------------------------------------ */
+
+async function sendMessageStream({ message, history, sessionId, onDelta, onDone, signal }) {
+  const token = localStorage.getItem("session_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const response = await fetch(`${API_BASE}/api/chat/stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ message, history, session_id: sessionId }),
     signal,
+    credentials: "same-origin",
   });
 
   if (!response.ok) {
@@ -52,6 +149,10 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
 
       if (payload.delta) {
         onDelta(payload.delta);
+      }
+
+      if (payload.done && onDone) {
+        onDone({ sessionId: payload.session_id, title: payload.title });
       }
     }
   }
