@@ -6,8 +6,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from backend.auth import create_access_token, hash_password
 from backend.database import Base, get_db
 from backend.main import app
+from backend.models import Session, User
 
 
 @pytest.fixture(scope="session")
@@ -50,7 +52,42 @@ def db_session(engine, tables):
 
 
 @pytest.fixture
-def client(db_session):
+def test_user(db_session):
+    """Cria um usuario de teste e retorna o objeto User."""
+    user = User(
+        email="test@example.com",
+        hashed_password=hash_password("123456"),
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def test_session(db_session, test_user):
+    """Cria uma sessao de teste para o usuario."""
+    session = Session(user_id=test_user.id)
+    db_session.add(session)
+    db_session.commit()
+    db_session.refresh(session)
+    return session
+
+
+@pytest.fixture
+def auth_token(test_user):
+    """Retorna um token JWT valido para o usuario de teste."""
+    return create_access_token(data={"sub": str(test_user.id)})
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    """Retorna headers de autenticacao para o usuario de teste."""
+    return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest.fixture
+def client(db_session, test_user):
     """Retorna um TestClient do FastAPI com o banco de testes injetado."""
 
     def _override_get_db():
