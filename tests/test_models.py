@@ -20,7 +20,7 @@ class TestChatMessage:
         assert msg.session_key == "default"
         assert msg.role == "user"
         assert msg.content == "Ola, mundo!"
-        assert msg.model == "google/gemma-4-31b-it"
+        assert msg.model == "deepseek/deepseek-v4-flash"
         assert isinstance(msg.created_at, datetime)
 
     def test_create_message_custom_session(self, db_session):

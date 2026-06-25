@@ -34,5 +34,5 @@ class ChatMessage(Base):
     session_key: Mapped[str] = mapped_column(String(120), default="default", index=True)
     role: Mapped[str] = mapped_column(String(20), index=True)
     content: Mapped[str] = mapped_column(Text)
-    model: Mapped[str] = mapped_column(String(120), default="google/gemma-4-31b-it")
+    model: Mapped[str] = mapped_column(String(120), default="deepseek/deepseek-v4-flash")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
