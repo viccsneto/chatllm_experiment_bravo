@@ -59,15 +59,56 @@ async function apiMe() {
   return res.json();
 }
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
+function _authHeaders() {
   const headers = { "Content-Type": "application/json" };
   const token = getToken();
   if (token) headers["token"] = token;
+  return headers;
+}
+
+async function apiCreateSession() {
+  const res = await fetch(`${API_BASE}/api/sessions`, {
+    method: "POST",
+    headers: _authHeaders(),
+  });
+  if (!res.ok) throw new Error("Erro ao criar sessao");
+  return res.json();
+}
+
+async function apiListSessions() {
+  const res = await fetch(`${API_BASE}/api/sessions`, {
+    headers: _authHeaders(),
+  });
+  if (!res.ok) throw new Error("Erro ao listar sessoes");
+  return res.json();
+}
+
+async function apiGetSessionMessages(sessionId) {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
+    headers: _authHeaders(),
+  });
+  if (!res.ok) throw new Error("Erro ao carregar mensagens");
+  return res.json();
+}
+
+async function apiDeleteSession(sessionId) {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers: _authHeaders(),
+  });
+  if (!res.ok) throw new Error("Erro ao deletar sessao");
+}
+
+async function sendMessageStream({ message, sessionId, history, onDelta, onDone, signal }) {
+  const headers = _authHeaders();
+
+  const body = { message, history };
+  if (sessionId) body.session_id = sessionId;
 
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(body),
     signal,
   });
 
@@ -115,6 +156,10 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
 
       if (payload.delta) {
         onDelta(payload.delta);
+      }
+
+      if (payload.done && onDone) {
+        onDone(payload);
       }
     }
   }

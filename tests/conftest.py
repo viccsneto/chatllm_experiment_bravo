@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database import Base, get_db
 from backend.main import app
-from backend.models import Session as DbSession
+from backend.models import AuthSession as DbSession
 from backend.models import User
 
 

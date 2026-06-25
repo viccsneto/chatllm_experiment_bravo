@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models import Session, User
+from backend.models import AuthSession, User
 from backend.schemas.auth import (
     AuthResponse,
     LoginRequest,
@@ -31,10 +31,10 @@ def _generate_token() -> str:
 def _get_current_user(token: str | None = Header(None), db: Session = Depends(get_db)) -> User:
     if not token:
         raise HTTPException(status_code=401, detail="Token nao fornecido")
-    session = db.query(Session).filter(Session.token == token).first()
-    if not session:
+    auth_session = db.query(AuthSession).filter(AuthSession.token == token).first()
+    if not auth_session:
         raise HTTPException(status_code=401, detail="Token invalido ou expirado")
-    user = db.query(User).filter(User.id == session.user_id).first()
+    user = db.query(User).filter(User.id == auth_session.user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="Usuario nao encontrado")
     return user
@@ -51,7 +51,7 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     db.refresh(user)
 
     token = _generate_token()
-    db.add(Session(user_id=user.id, token=token))
+    db.add(AuthSession(user_id=user.id, token=token))
     db.commit()
 
     return AuthResponse(token=token, email=user.email)
@@ -64,7 +64,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Email ou senha invalidos")
 
     token = _generate_token()
-    db.add(Session(user_id=user.id, token=token))
+    db.add(AuthSession(user_id=user.id, token=token))
     db.commit()
 
     return AuthResponse(token=token, email=user.email)
@@ -73,9 +73,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/api/auth/logout", response_model=MessageResponse)
 def logout(token: str | None = Header(None), db: Session = Depends(get_db)):
     if token:
-        session = db.query(Session).filter(Session.token == token).first()
-        if session:
-            db.delete(session)
+        auth_session = db.query(AuthSession).filter(AuthSession.token == token).first()
+        if auth_session:
+            db.delete(auth_session)
             db.commit()
     return MessageResponse(message="Logout realizado com sucesso")
 

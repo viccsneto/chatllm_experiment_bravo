@@ -5,25 +5,25 @@
 **Hard rule**: AI agents must not edit this file and must not draft paste-ready content for it.
 
 ## R — Repeat (The Problem)
-_State the problem in your own words. Confirm that you share the same mental model of the goal._
+Criar uma barra lateral com sessão de chats com histórico o título gerado baseado na primeira conversa
 
 ## E — Examples
 _Provide concrete inputs and expected outputs that demonstrate the correctness. Base them on observable behavior._
 
-- **Happy Path Input**: ...
-  **Output**: ...
+- **Happy Path Input**: Carregar sessão antiga com histórico
+  **Output**: quando o usuário loga, ele tem uma barra lateral com suas sessões já criadas, podendo alternar entre ela ou criar uma nova
 
-- **Edge Case Input**: ...
-  **Output**: ...
+- **Edge Case Input**: Uma nova sessão ganha um título baseado na primeira conversa
+  **Output**: Quando o usuário cria uma nova sessão, após sua primeira conversa um título é gerado
 
 ## A — Approach
-_Describe your high-level strategy conceptually. How did you design the solution?_
+Criar modelo relacional de chat e session, referenciando o usuário, após a primeira conversa quando a mensagem é enviada para o backend, é conferido se a sessão já possui título ou não, caso não, um novo é gerado é o título é atualizado.
 
 ## C — Code
-_Identify the most critical code changes, format as actual files, functions, or methods. Justify the intent of your design choices rather than just acknowledging the syntax changes._
+A autenticação do usuário é essencial para que as sessões sejam mantidas privadas
 
 ## T — Tests
-_Explain how the solution was validated, pointing to the actual test files, functions, or methods. Document any manual or automated tests._
+Foi validado através de testes unitários e também manualmente
 
 ## O — Optimize
 _Address Big(O) complexity, note that sometimes it doesn't apply, trade-offs, constraints, and opportunities for future improvement._
