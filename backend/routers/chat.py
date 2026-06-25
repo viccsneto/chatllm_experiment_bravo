@@ -9,16 +9,12 @@ from sqlalchemy.orm import Session
 from backend.config import OPENROUTER_MODEL_DEFAULT
 from backend.database import get_db
 from backend.models import ChatMessage
+from backend.routers.auth import _get_current_user
 from backend.schemas.chat import ChatRequest, ChatResponse
 from backend.services.openrouter import OpenRouterConfigError, generate_reply, stream_reply
 
 
-router = APIRouter()
-
-
-@router.get("/health")
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+router = APIRouter(dependencies=[Depends(_get_current_user)])
 
 
 @router.post("/api/chat", response_model=ChatResponse)

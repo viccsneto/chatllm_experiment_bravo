@@ -1,9 +1,72 @@
 const API_BASE = window.location.origin;
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
-  const response = await fetch(`${API_BASE}/api/chat/stream`, {
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+function setToken(token) {
+  localStorage.setItem("token", token);
+}
+
+function clearToken() {
+  localStorage.removeItem("token");
+}
+
+async function apiSignup(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Erro ao cadastrar");
+  setToken(data.token);
+  return data;
+}
+
+async function apiLogin(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Erro ao entrar");
+  setToken(data.token);
+  return data;
+}
+
+async function apiLogout() {
+  const token = getToken();
+  if (!token) return;
+  await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", token },
+  });
+  clearToken();
+}
+
+async function apiMe() {
+  const token = getToken();
+  if (!token) return null;
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { token },
+  });
+  if (!res.ok) {
+    clearToken();
+    return null;
+  }
+  return res.json();
+}
+
+async function sendMessageStream({ message, history, onDelta, signal }) {
+  const headers = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers["token"] = token;
+
+  const response = await fetch(`${API_BASE}/api/chat/stream`, {
+    method: "POST",
+    headers,
     body: JSON.stringify({ message, history }),
     signal,
   });
