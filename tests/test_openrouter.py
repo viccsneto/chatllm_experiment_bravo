@@ -131,7 +131,7 @@ class TestGenerateReply:
                     user_message="Ola",
                     history=[],
                 )
-                assert model == "google/gemma-4-31b-it"
+                assert model == "deepseek/deepseek-v4-flash"
 
     @pytest.mark.asyncio
     async def test_raises_on_http_error(self):

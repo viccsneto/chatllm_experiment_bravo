@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -8,6 +11,12 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database import Base, get_db
 from backend.main import app
+from backend.models import AuthSession as DbSession
+from backend.models import User
+
+
+def _fake_token():
+    return hashlib.sha256(os.urandom(32)).hexdigest()
 
 
 @pytest.fixture(scope="session")
@@ -50,8 +59,24 @@ def db_session(engine, tables):
 
 
 @pytest.fixture
-def client(db_session):
+def test_user(db_session):
+    """Cria um usuario de teste e retorna (user, token)."""
+    user = User(email="teste@teste.com", password_hash=hashlib.sha256(b"1234").hexdigest())
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    token = _fake_token()
+    db_session.add(DbSession(user_id=user.id, token=token))
+    db_session.commit()
+
+    return user, token
+
+
+@pytest.fixture
+def client(db_session, test_user):
     """Retorna um TestClient do FastAPI com o banco de testes injetado."""
+    _, token = test_user
 
     def _override_get_db():
         try:
@@ -62,6 +87,7 @@ def client(db_session):
     app.dependency_overrides[get_db] = _override_get_db
 
     with TestClient(app) as test_client:
+        test_client.headers["token"] = token
         yield test_client
 
     app.dependency_overrides.clear()
