@@ -16,3 +16,11 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SQLITE_PATH = ROOT_DIR / "database" / "chat.db"
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{SQLITE_PATH}"
+
+AUTH_COOKIE_NAME = "chatllm_session"
+AUTH_SESSION_DAYS = 7
+AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}

@@ -125,13 +125,21 @@ class TestGenerateReply:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
+        # O default vem de OPENROUTER_MODEL no .env, que varia por ambiente.
+        # O teste fixa a constante para verificar o fallback, e nao o seu valor.
         with patch("backend.services.openrouter.OPENROUTER_API_KEY", "sk-test"):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                reply, model = await generate_reply(
-                    user_message="Ola",
-                    history=[],
-                )
-                assert model == "google/gemma-4-31b-it"
+            with patch(
+                "backend.services.openrouter.OPENROUTER_MODEL_DEFAULT",
+                "modelo/default-de-teste",
+            ):
+                with patch("httpx.AsyncClient", return_value=mock_client):
+                    reply, model = await generate_reply(
+                        user_message="Ola",
+                        history=[],
+                    )
+
+        assert model == "modelo/default-de-teste"
+        assert mock_client.post.await_args.kwargs["json"]["model"] == "modelo/default-de-teste"
 
     @pytest.mark.asyncio
     async def test_raises_on_http_error(self):

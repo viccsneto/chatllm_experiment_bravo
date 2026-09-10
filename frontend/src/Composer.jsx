@@ -1,6 +1,6 @@
 const { useEffect, useRef } = React;
 
-function Composer({ text, busy, error, onChangeText, onSubmit, onStop }) {
+function Composer({ text, busy, disabled = false, error, onChangeText, onSubmit, onStop }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -28,13 +28,13 @@ function Composer({ text, busy, error, onChangeText, onSubmit, onStop }) {
           onChange={(event) => onChangeText(event.target.value)}
           placeholder="Mensagem para ChatLLM Lab"
           maxLength={8000}
-          disabled={busy}
+          disabled={busy || disabled}
           autoFocus
         />
         <button
           type={busy ? "button" : "submit"}
           onClick={busy ? handleStop : undefined}
-          disabled={!busy && !text.trim()}
+          disabled={disabled || (!busy && !text.trim())}
           aria-label={busy ? "Parar" : "Enviar"}
         >
           {busy ? (
