@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,18 +22,29 @@ class TestRootEndpoint:
 
 
 class TestChatEndpoint:
-    def test_chat_endpoint_exists(self, client: TestClient):
-        """Verifica que o endpoint /api/chat responde (espera erro de config sem API key)."""
+    def test_chat_requires_authentication(self, client: TestClient):
         response = client.post(
             "/api/chat",
             json={"message": "Ola"},
         )
-        # Sem OPENROUTER_API_KEY definida, esperamos 503 (config error)
-        assert response.status_code in (200, 422, 503)
+        assert response.status_code == 401
 
-    def test_chat_empty_message_rejected(self, client: TestClient):
+    def test_chat_endpoint_exists(self, authenticated_client: TestClient):
+        with patch(
+            "backend.routers.chat.generate_reply",
+            new=AsyncMock(return_value=("Resposta mockada", "test-model")),
+        ):
+            response = authenticated_client.post(
+                "/api/chat",
+                json={"message": "Ola"},
+            )
+
+        assert response.status_code == 200
+        assert response.json() == {"reply": "Resposta mockada", "model": "test-model"}
+
+    def test_chat_empty_message_rejected(self, authenticated_client: TestClient):
         """Mensagem vazia deve ser rejeitada com 422 (validacao Pydantic)."""
-        response = client.post(
+        response = authenticated_client.post(
             "/api/chat",
             json={"message": ""},
         )
@@ -39,18 +52,31 @@ class TestChatEndpoint:
 
 
 class TestChatStreamEndpoint:
-    def test_chat_stream_endpoint_exists(self, client: TestClient):
-        """Verifica que o endpoint /api/chat/stream aceita requisicoes."""
+    def test_chat_stream_requires_authentication(self, client: TestClient):
         response = client.post(
             "/api/chat/stream",
             json={"message": "Ola"},
         )
-        # Streaming pode iniciar e depois falhar sem API key
-        assert response.status_code in (200, 422, 503)
+        assert response.status_code == 401
 
-    def test_chat_stream_empty_message_rejected(self, client: TestClient):
+    def test_chat_stream_endpoint_exists(self, authenticated_client: TestClient):
+        """Verifica que o endpoint /api/chat/stream aceita requisicoes."""
+        async def fake_stream_reply(**_kwargs):
+            yield "Resposta"
+
+        with patch("backend.routers.chat.stream_reply", new=fake_stream_reply):
+            response = authenticated_client.post(
+                "/api/chat/stream",
+                json={"message": "Ola"},
+            )
+
+        assert response.status_code == 200
+        assert '"delta": "Resposta"' in response.text
+        assert '"done": true' in response.text
+
+    def test_chat_stream_empty_message_rejected(self, authenticated_client: TestClient):
         """Stream com mensagem vazia deve ser rejeitado com 422."""
-        response = client.post(
+        response = authenticated_client.post(
             "/api/chat/stream",
             json={"message": ""},
         )

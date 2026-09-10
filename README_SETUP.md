@@ -90,8 +90,15 @@ Para iniciar a API com debugging:
 ## Endpoints da API
 
 1. `GET /health` retorna status da API.
-2. `POST /api/chat` envia mensagem para o modelo e retorna resposta.
-3. `POST /api/chat/stream` envia mensagem e retorna a resposta em streaming (SSE), com renderizacao progressiva no chat.
+2. `POST /api/auth/register` cria um usuario e inicia uma sessao autenticada.
+3. `POST /api/auth/login` autentica por e-mail e senha.
+4. `GET /api/auth/me` retorna o usuario da sessao atual.
+5. `POST /api/auth/logout` encerra a sessao atual.
+6. `POST /api/chat` envia mensagem para o modelo e retorna resposta (requer autenticacao).
+7. `POST /api/chat/stream` envia mensagem e retorna a resposta em streaming SSE (requer autenticacao).
+
+A sessao de autenticacao e mantida em cookie `HttpOnly`. Em ambientes HTTPS, defina
+`AUTH_COOKIE_SECURE=true` no `.env` para restringir o envio do cookie a conexoes seguras.
 
 Exemplo de request:
 

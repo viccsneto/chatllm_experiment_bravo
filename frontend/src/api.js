@@ -1,9 +1,62 @@
 const API_BASE = window.location.origin;
 
+async function getErrorMessage(response, fallback) {
+  const body = await response.json().catch(() => ({}));
+  if (typeof body?.detail === "string") return body.detail;
+  if (Array.isArray(body?.detail) && body.detail[0]?.msg) return body.detail[0].msg;
+  return fallback;
+}
+
+async function getCurrentUser() {
+  const response = await fetch(`${API_BASE}/api/auth/me`, {
+    credentials: "same-origin",
+  });
+
+  if (response.status === 401) return null;
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Erro ao verificar a autenticacao."));
+  }
+  return response.json();
+}
+
+async function submitCredentials(path, credentials) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(credentials),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Nao foi possivel autenticar."));
+  }
+  return response.json();
+}
+
+function registerUser(credentials) {
+  return submitCredentials("/api/auth/register", credentials);
+}
+
+function loginUser(credentials) {
+  return submitCredentials("/api/auth/login", credentials);
+}
+
+async function logoutUser() {
+  const response = await fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Nao foi possivel sair."));
+  }
+}
+
 async function sendMessageStream({ message, history, onDelta, signal }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
     body: JSON.stringify({ message, history }),
     signal,
   });

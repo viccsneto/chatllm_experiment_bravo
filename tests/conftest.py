@@ -65,3 +65,14 @@ def client(db_session):
         yield test_client
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def authenticated_client(client):
+    """Retorna um cliente com uma sessao de usuario valida."""
+    response = client.post(
+        "/api/auth/register",
+        json={"email": "teste@example.com", "password": "senha-segura"},
+    )
+    assert response.status_code == 201
+    return client
