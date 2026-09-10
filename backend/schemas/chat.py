@@ -12,6 +12,7 @@ class ChatMessageIn(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    session_id: int | None = Field(default=None, gt=0)
     model: str | None = None
     history: list[ChatMessageIn] = Field(default_factory=list)
 
@@ -19,3 +20,5 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     model: str
+    session_id: int
+    title: str | None

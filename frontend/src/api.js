@@ -52,12 +52,43 @@ async function logoutUser() {
   }
 }
 
-async function sendMessageStream({ message, history, onDelta, signal }) {
+async function listChatSessions() {
+  const response = await fetch(`${API_BASE}/api/sessions`, {
+    credentials: "same-origin",
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Erro ao carregar conversas."));
+  }
+  return response.json();
+}
+
+async function createChatSession() {
+  const response = await fetch(`${API_BASE}/api/sessions`, {
+    method: "POST",
+    credentials: "same-origin",
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Erro ao criar conversa."));
+  }
+  return response.json();
+}
+
+async function getChatSession(sessionId) {
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+    credentials: "same-origin",
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Erro ao carregar a conversa."));
+  }
+  return response.json();
+}
+
+async function sendMessageStream({ message, sessionId, onDelta, onDone, signal }) {
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, session_id: sessionId }),
     signal,
   });
 
@@ -105,6 +136,10 @@ async function sendMessageStream({ message, history, onDelta, signal }) {
 
       if (payload.delta) {
         onDelta(payload.delta);
+      }
+
+      if (payload.done) {
+        onDone?.(payload);
       }
     }
   }

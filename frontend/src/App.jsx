@@ -1,4 +1,4 @@
-const { useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useRef, useState } = React;
 
 function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -14,6 +14,15 @@ function createInitialMessages() {
   ];
 }
 
+function messagesFromSession(storedMessages) {
+  if (!storedMessages?.length) return createInitialMessages();
+  return storedMessages.map((message) => ({
+    id: `stored-${message.id}`,
+    role: message.role,
+    content: message.content,
+  }));
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -21,17 +30,15 @@ function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authError, setAuthError] = useState("");
   const [messages, setMessages] = useState(createInitialMessages);
+  const [sessions, setSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [error, setError] = useState("");
   const messagesRef = useRef(null);
   const abortControllerRef = useRef(null);
-
-  const chatHistory = useMemo(
-    () => messages.filter((msg) => msg.role === "user" || msg.role === "assistant"),
-    [messages]
-  );
 
   useEffect(() => {
     const el = messagesRef.current;
@@ -56,6 +63,43 @@ function App() {
       abortControllerRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    let active = true;
+    const loadSessions = async () => {
+      setSessionsLoading(true);
+      setError("");
+      try {
+        let availableSessions = await listChatSessions();
+        if (!active) return;
+
+        if (availableSessions.length === 0) {
+          const created = await createChatSession();
+          availableSessions = [created];
+        }
+        if (!active) return;
+
+        const selected = availableSessions[0];
+        const detail = await getChatSession(selected.id);
+        if (!active) return;
+
+        setSessions(availableSessions);
+        setActiveSessionId(selected.id);
+        setMessages(messagesFromSession(detail.messages));
+      } catch (err) {
+        if (active) setError(err.message || "Nao foi possivel carregar as conversas.");
+      } finally {
+        if (active) setSessionsLoading(false);
+      }
+    };
+
+    loadSessions();
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const onAuthenticate = async (credentials) => {
     setAuthBusy(true);
@@ -84,6 +128,8 @@ function App() {
     try {
       await logoutUser();
       setUser(null);
+      setSessions([]);
+      setActiveSessionId(null);
       setMessages(createInitialMessages());
       setText("");
     } catch (err) {
@@ -97,6 +143,39 @@ function App() {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setBusy(false);
+  };
+
+  const onNewSession = async () => {
+    if (busy || sessionsLoading) return;
+    setSessionsLoading(true);
+    setError("");
+    try {
+      const created = await createChatSession();
+      setSessions((current) => [created, ...current]);
+      setActiveSessionId(created.id);
+      setMessages(createInitialMessages());
+      setText("");
+    } catch (err) {
+      setError(err.message || "Nao foi possivel criar a conversa.");
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const onSelectSession = async (sessionId) => {
+    if (busy || sessionsLoading || sessionId === activeSessionId) return;
+    setSessionsLoading(true);
+    setError("");
+    try {
+      const detail = await getChatSession(sessionId);
+      setActiveSessionId(sessionId);
+      setMessages(messagesFromSession(detail.messages));
+      setText("");
+    } catch (err) {
+      setError(err.message || "Nao foi possivel carregar a conversa.");
+    } finally {
+      setSessionsLoading(false);
+    }
   };
 
   const onSubmit = async (event, inputRef) => {
@@ -117,11 +196,12 @@ function App() {
     setBusy(true);
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+    let completedSession = null;
 
     try {
       await sendMessageStream({
         message: cleaned,
-        history: chatHistory,
+        sessionId: activeSessionId,
         signal: abortController.signal,
         onDelta: (delta) => {
           setMessages((prev) =>
@@ -132,7 +212,16 @@ function App() {
             )
           );
         },
+        onDone: (payload) => {
+          completedSession = payload;
+          setActiveSessionId(payload.session_id);
+        },
       });
+
+      if (completedSession) {
+        const refreshedSessions = await listChatSessions();
+        setSessions(refreshedSessions);
+      }
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -200,24 +289,38 @@ function App() {
         </div>
       </header>
 
-      <section className="messages" aria-live="polite" ref={messagesRef}>
-        <div className="messages-inner">
-          {messages.map((msg) => (
-            <article key={msg.id} className={`bubble ${msg.role}`}>
-              <MessageContent content={msg.content} />
-            </article>
-          ))}
-        </div>
-      </section>
+      <div className="workspace">
+        <Sidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          loading={sessionsLoading}
+          disabled={busy}
+          onNew={onNewSession}
+          onSelect={onSelectSession}
+        />
 
-      <Composer
-        text={text}
-        busy={busy}
-        error={error}
-        onChangeText={setText}
-        onSubmit={onSubmit}
-        onStop={onStop}
-      />
+        <section className="chat-pane">
+          <section className="messages" aria-live="polite" ref={messagesRef}>
+            <div className="messages-inner">
+              {messages.map((msg) => (
+                <article key={msg.id} className={`bubble ${msg.role}`}>
+                  <MessageContent content={msg.content} />
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <Composer
+            text={text}
+            busy={busy}
+            disabled={sessionsLoading}
+            error={error}
+            onChangeText={setText}
+            onSubmit={onSubmit}
+            onStop={onStop}
+          />
+        </section>
+      </div>
 
       <div className="warning-banner">Lembre-se, você precisa focar no experimento!!!</div>
     </main>
